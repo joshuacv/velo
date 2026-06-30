@@ -23,9 +23,26 @@ export interface TelegramMessage {
   date: number;
 }
 
+export interface TelegramCallbackQuery {
+  id: string;
+  from: TelegramUser;
+  message?: TelegramMessage;
+  data?: string;
+}
+
 export interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
+}
+
+export interface InlineKeyboardButton {
+  text: string;
+  callback_data: string;
+}
+
+export interface InlineKeyboardMarkup {
+  inline_keyboard: InlineKeyboardButton[][];
 }
 
 interface TelegramResponse<T> {
@@ -71,7 +88,7 @@ export function getUpdates(
   return call<TelegramUpdate[]>(
     token,
     "getUpdates",
-    { offset, timeout: timeoutSec, allowed_updates: ["message"] },
+    { offset, timeout: timeoutSec, allowed_updates: ["message", "callback_query"] },
     signal,
   );
 }
@@ -84,9 +101,31 @@ function chunk(text: string, size = 4000): string[] {
   return parts;
 }
 
-export async function sendMessage(token: string, chatId: number, text: string): Promise<void> {
-  for (const part of chunk(text)) {
-    await call(token, "sendMessage", { chat_id: chatId, text: part });
+export async function sendMessage(
+  token: string,
+  chatId: number,
+  text: string,
+  replyMarkup?: InlineKeyboardMarkup,
+): Promise<void> {
+  const parts = chunk(text);
+  for (let i = 0; i < parts.length; i++) {
+    const params: Record<string, unknown> = { chat_id: chatId, text: parts[i] };
+    // Attach buttons only to the final chunk.
+    if (replyMarkup && i === parts.length - 1) params.reply_markup = replyMarkup;
+    await call(token, "sendMessage", params);
+  }
+}
+
+/** Acknowledge a button tap (stops the client-side loading spinner). */
+export async function answerCallbackQuery(
+  token: string,
+  callbackQueryId: string,
+  text?: string,
+): Promise<void> {
+  try {
+    await call(token, "answerCallbackQuery", { callback_query_id: callbackQueryId, text });
+  } catch {
+    /* non-critical */
   }
 }
 
