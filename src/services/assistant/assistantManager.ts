@@ -7,9 +7,22 @@
  * encrypted and only used to talk to Telegram.
  */
 import { getSetting, setSetting, getSecureSetting, setSecureSetting } from "@/services/db/settings";
-import { getUpdates, sendMessage, sendTyping, getMe } from "./telegram";
-import type { TelegramUpdate } from "./telegram";
+import { sendEmail, createDraft } from "@/services/emailActions";
+import {
+  getUpdates,
+  sendMessage,
+  sendTyping,
+  getMe,
+  answerCallbackQuery,
+} from "./telegram";
+import type {
+  TelegramUpdate,
+  TelegramMessage,
+  TelegramCallbackQuery,
+  InlineKeyboardMarkup,
+} from "./telegram";
 import { runAgentTurn, type ChatTurn } from "./agent";
+import type { StagedReply } from "./tools";
 
 const POLL_TIMEOUT_SEC = 30;
 const ERROR_BACKOFF_MS = 3000;
@@ -56,6 +69,9 @@ export async function testToken(token: string): Promise<{ ok: boolean; username?
 let running = false;
 let controller: AbortController | null = null;
 const histories = new Map<number, ChatTurn[]>();
+/** Replies staged by propose_reply, awaiting a button tap. Keyed by short token. */
+const pendingReplies = new Map<string, StagedReply>();
+let replyTokenCounter = 0;
 
 export function isAssistantRunning(): boolean {
   return running;
@@ -102,7 +118,11 @@ async function pollLoop(token: string, allowedUserId: string | null): Promise<vo
     for (const update of updates) {
       offset = Math.max(offset, update.update_id + 1);
       try {
-        await handleUpdate(token, allowedUserId, update);
+        if (update.callback_query) {
+          await handleCallback(token, allowedUserId, update.callback_query);
+        } else if (update.message) {
+          await handleMessage(token, allowedUserId, update.message);
+        }
       } catch (err) {
         console.error("[assistant] error handling update:", err);
       }
@@ -110,13 +130,12 @@ async function pollLoop(token: string, allowedUserId: string | null): Promise<vo
   }
 }
 
-async function handleUpdate(
+async function handleMessage(
   token: string,
   allowedUserId: string | null,
-  update: TelegramUpdate,
+  msg: TelegramMessage,
 ): Promise<void> {
-  const msg = update.message;
-  if (!msg?.text || !msg.from) return;
+  if (!msg.text || !msg.from) return;
   const chatId = msg.chat.id;
   const fromId = String(msg.from.id);
   const text = msg.text.trim();
@@ -136,7 +155,7 @@ async function handleUpdate(
     await sendMessage(
       token,
       chatId,
-      "Hi! I'm your Velo email assistant. Ask me things like \"any important email today?\" or \"summarize the latest from Sarah.\"\n\n(Read-only for now — I can read and summarize, but not send yet.)",
+      "Hi! I'm your Velo email assistant. Ask me to summarize mail or draft a reply — e.g. \"reply to Sarah that I'll review by Friday.\" I'll show you the draft with Send / Save / Cancel buttons before anything goes out.",
     );
     return;
   }
@@ -147,10 +166,91 @@ async function handleUpdate(
   }
 
   await sendTyping(token, chatId);
+
+  // Capture any reply the agent stages during this turn.
+  let staged: StagedReply | null = null;
   const prior = histories.get(chatId) ?? [];
-  const { reply, history } = await runAgentTurn(prior, text);
+  const { reply, history } = await runAgentTurn(prior, text, {
+    stageReply: (r) => {
+      staged = r;
+    },
+  });
   histories.set(chatId, history.slice(-MAX_HISTORY_TURNS));
   await sendMessage(token, chatId, reply);
+
+  if (staged) await presentDraft(token, chatId, staged);
+}
+
+/** Post the staged draft with confirmation buttons. */
+async function presentDraft(token: string, chatId: number, reply: StagedReply): Promise<void> {
+  const tokenId = `r${++replyTokenCounter}`;
+  pendingReplies.set(tokenId, reply);
+  const preview = `📧 Reply to ${reply.to.join(", ")}\nSubject: ${reply.subject}\n\n${reply.bodyText}`;
+  const keyboard: InlineKeyboardMarkup = {
+    inline_keyboard: [
+      [
+        { text: "✅ Send", callback_data: `send:${tokenId}` },
+        { text: "📝 Save draft", callback_data: `draft:${tokenId}` },
+        { text: "❌ Cancel", callback_data: `cancel:${tokenId}` },
+      ],
+    ],
+  };
+  await sendMessage(token, chatId, preview, keyboard);
+}
+
+async function handleCallback(
+  token: string,
+  allowedUserId: string | null,
+  cq: TelegramCallbackQuery,
+): Promise<void> {
+  const chatId = cq.message?.chat.id;
+  const fromId = String(cq.from.id);
+  if (chatId === undefined) return;
+  if (allowedUserId && fromId !== allowedUserId) {
+    await answerCallbackQuery(token, cq.id);
+    return;
+  }
+
+  const [action, tokenId] = (cq.data ?? "").split(":");
+  const reply = tokenId ? pendingReplies.get(tokenId) : undefined;
+  if (!reply) {
+    await answerCallbackQuery(token, cq.id, "This draft has expired.");
+    await sendMessage(token, chatId, "That draft is no longer available — ask me to draft it again.");
+    return;
+  }
+  pendingReplies.delete(tokenId!);
+
+  if (action === "cancel") {
+    await answerCallbackQuery(token, cq.id, "Cancelled");
+    await sendMessage(token, chatId, "❌ Discarded.");
+    return;
+  }
+
+  if (action === "send") {
+    await answerCallbackQuery(token, cq.id, "Sending…");
+    const res = await sendEmail(reply.accountId, reply.rawBase64Url, reply.threadId);
+    await sendMessage(
+      token,
+      chatId,
+      res.success
+        ? `✅ Sent to ${reply.to.join(", ")}.`
+        : `Couldn't send: ${res.error ?? "unknown error"}. ${res.queued ? "(Queued — will retry when online.)" : ""}`,
+    );
+    return;
+  }
+
+  if (action === "draft") {
+    await answerCallbackQuery(token, cq.id, "Saving…");
+    const res = await createDraft(reply.accountId, reply.rawBase64Url, reply.threadId);
+    await sendMessage(
+      token,
+      chatId,
+      res.success ? "📝 Saved to drafts." : `Couldn't save draft: ${res.error ?? "unknown error"}.`,
+    );
+    return;
+  }
+
+  await answerCallbackQuery(token, cq.id);
 }
 
 function delay(ms: number): Promise<void> {

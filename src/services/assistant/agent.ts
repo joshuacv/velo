@@ -9,7 +9,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { getSecureSetting, getSetting } from "@/services/db/settings";
-import { buildTools } from "./tools";
+import { buildTools, type AssistantContext } from "./tools";
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 
@@ -18,17 +18,19 @@ const MAX_TOOL_STEPS = 8;
 
 const SYSTEM_PROMPT = `You are Velo's email assistant, reached by the user over a Telegram chat from their phone.
 
-You can:
+Tools:
 - list_recent_threads — see recent inbox conversations
 - read_thread — read the full messages of one conversation
+- propose_reply — draft a reply and show it to the user for confirmation
 
-Right now you are READ-ONLY: you can read and summarize mail, but you cannot send, reply to, archive, or change anything yet. If the user asks you to send or reply, explain that sending isn't enabled yet and offer to draft the text so they can review it.
+Replying: when the user wants to reply, read the relevant thread first so you have the context, write a complete reply in their voice, then call propose_reply with the thread ref and your drafted body. propose_reply does NOT send — the user gets Send / Save-to-drafts / Cancel buttons and decides. Never claim a message was sent; after proposing, just say you've drafted it and they can review the buttons. You cannot send directly, archive, or delete.
 
 Style: you're on a phone. Be concise and skimmable. Lead with the answer. Use short lines, not walls of text. When listing emails, give sender + subject + a one-line gist, newest first. Don't dump raw JSON at the user.`;
 
 export async function runAgentTurn(
   history: ChatTurn[],
   userText: string,
+  ctx: AssistantContext = {},
 ): Promise<{ reply: string; history: ChatTurn[] }> {
   const apiKey = await getSecureSetting("claude_api_key");
   if (!apiKey) {
@@ -41,7 +43,7 @@ export async function runAgentTurn(
   const model = (await getSetting("claude_model")) ?? DEFAULT_MODEL;
   const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
 
-  const tools = buildTools();
+  const tools = buildTools(ctx);
   const toolDefs = tools.map((t) => t.def);
 
   // Working message list for this turn (includes ephemeral tool blocks).

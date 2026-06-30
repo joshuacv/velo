@@ -1,14 +1,31 @@
 /**
- * Read-only email tools the assistant agent can call.
+ * Email tools the assistant agent can call.
  *
- * Slice 1 is intentionally read-only: it queries Velo's *local cache* (already
- * synced) rather than hitting the network, and exposes no actions that can
- * modify or send mail. Reply/send arrives in slice 2 behind a confirmation gate.
+ * Read tools query Velo's *local cache* (already synced). The write path
+ * (propose_reply) never sends or saves on its own — it *stages* a reply for the
+ * user to confirm with buttons in Telegram. Actual send/save runs only on an
+ * explicit tap, through Velo's offline-aware emailActions.
  */
 import type Anthropic from "@anthropic-ai/sdk";
-import { getAllAccounts } from "@/services/db/accounts";
+import { getAllAccounts, getAccount } from "@/services/db/accounts";
 import { getThreadsForAccount } from "@/services/db/threads";
 import { getMessagesForThread } from "@/services/db/messages";
+import { buildRawEmail } from "@/utils/emailBuilder";
+
+/** A reply composed and ready to send/save, awaiting user confirmation. */
+export interface StagedReply {
+  accountId: string;
+  threadId: string;
+  to: string[];
+  subject: string;
+  bodyText: string;
+  rawBase64Url: string;
+}
+
+export interface AssistantContext {
+  /** Called by propose_reply to hand a finished draft to the manager for confirmation. */
+  stageReply?: (reply: StagedReply) => void;
+}
 
 export interface AssistantTool {
   def: Anthropic.Tool;
@@ -17,17 +34,22 @@ export interface AssistantTool {
 
 const REF_SEP = "::";
 
-/** Epoch values in the cache are sometimes seconds, sometimes ms — normalize. */
 function toIso(ts: number | null | undefined): string {
   if (!ts) return "unknown";
   const ms = ts < 1e12 ? ts * 1000 : ts;
   return new Date(ms).toISOString().slice(0, 16).replace("T", " ");
 }
 
-/** Mail accounts only (skip calendar/caldav accounts). */
 async function mailAccounts() {
   const all = await getAllAccounts();
   return all.filter((a) => a.provider !== "caldav");
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 const listRecentThreads: AssistantTool = {
@@ -35,14 +57,11 @@ const listRecentThreads: AssistantTool = {
     name: "list_recent_threads",
     description:
       "List the most recent inbox conversations across the user's mail accounts. " +
-      "Returns a compact JSON array; use each item's `ref` with read_thread to open it.",
+      "Returns a compact JSON array; use each item's `ref` with read_thread or propose_reply.",
     input_schema: {
       type: "object",
       properties: {
-        limit: {
-          type: "integer",
-          description: "Max threads per account (default 10, max 30).",
-        },
+        limit: { type: "integer", description: "Max threads per account (default 10, max 30)." },
       },
     },
   },
@@ -80,38 +99,112 @@ const readThread: AssistantTool = {
     input_schema: {
       type: "object",
       properties: {
-        ref: {
-          type: "string",
-          description: "Thread reference in the form accountId::threadId.",
-        },
+        ref: { type: "string", description: "Thread reference in the form accountId::threadId." },
       },
       required: ["ref"],
     },
   },
   async run(input) {
-    const ref = String(input.ref ?? "");
-    const sepIdx = ref.indexOf(REF_SEP);
-    if (sepIdx === -1) return `Invalid ref: ${ref}. Expected accountId::threadId.`;
-    const accountId = ref.slice(0, sepIdx);
-    const threadId = ref.slice(sepIdx + REF_SEP.length);
-    const messages = await getMessagesForThread(accountId, threadId);
+    const parsed = parseRef(String(input.ref ?? ""));
+    if (!parsed) return `Invalid ref. Expected accountId::threadId.`;
+    const messages = await getMessagesForThread(parsed.accountId, parsed.threadId);
     if (messages.length === 0) return "No messages found for that thread (not cached locally).";
-
-    const rendered = messages.map((m) => {
-      const body = (m.body_text || m.snippet || "").trim().slice(0, 4000);
-      return [
-        `From: ${m.from_name || ""} <${m.from_address || ""}>`,
-        `Date: ${toIso(m.date)}`,
-        `Subject: ${m.subject || "(no subject)"}`,
-        "",
-        body || "(no cached body — open in Velo to fetch full content)",
-      ].join("\n");
-    });
-    return rendered.join("\n\n---\n\n");
+    return messages
+      .map((m) =>
+        [
+          `From: ${m.from_name || ""} <${m.from_address || ""}>`,
+          `Date: ${toIso(m.date)}`,
+          `Subject: ${m.subject || "(no subject)"}`,
+          "",
+          (m.body_text || m.snippet || "").trim().slice(0, 4000) ||
+            "(no cached body — open in Velo to fetch full content)",
+        ].join("\n"),
+      )
+      .join("\n\n---\n\n");
   },
 };
 
-/** All read-only tools available to the agent in slice 1. */
-export function buildTools(): AssistantTool[] {
-  return [listRecentThreads, readThread];
+function parseRef(ref: string): { accountId: string; threadId: string } | null {
+  const idx = ref.indexOf(REF_SEP);
+  if (idx === -1) return null;
+  return { accountId: ref.slice(0, idx), threadId: ref.slice(idx + REF_SEP.length) };
+}
+
+function buildProposeReply(ctx: AssistantContext): AssistantTool {
+  return {
+    def: {
+      name: "propose_reply",
+      description:
+        "Draft a reply to a conversation and present it to the user for confirmation. " +
+        "This does NOT send — the user gets Send / Save-to-drafts / Cancel buttons and decides. " +
+        "Pass the thread `ref` and the full reply text you've written.",
+      input_schema: {
+        type: "object",
+        properties: {
+          ref: { type: "string", description: "Thread reference (accountId::threadId)." },
+          body: { type: "string", description: "The full plain-text reply to send." },
+        },
+        required: ["ref", "body"],
+      },
+    },
+    async run(input) {
+      if (!ctx.stageReply) return "Replying isn't available in this context.";
+      const parsed = parseRef(String(input.ref ?? ""));
+      if (!parsed) return "Invalid ref. Expected accountId::threadId.";
+      const body = String(input.body ?? "").trim();
+      if (!body) return "The reply body is empty.";
+
+      const account = await getAccount(parsed.accountId);
+      if (!account) return "That account no longer exists.";
+      const messages = await getMessagesForThread(parsed.accountId, parsed.threadId);
+      if (messages.length === 0) return "Can't reply — that thread isn't cached locally.";
+
+      // Reply to the most recent message not sent by the account owner.
+      const owner = account.email.toLowerCase();
+      const target =
+        [...messages].reverse().find((m) => (m.from_address || "").toLowerCase() !== owner) ??
+        messages[messages.length - 1]!;
+
+      const to = [target.reply_to || target.from_address].filter((x): x is string => !!x);
+      if (to.length === 0) return "Couldn't determine a recipient for the reply.";
+
+      const baseSubject = target.subject || "(no subject)";
+      const subject = /^re:/i.test(baseSubject) ? baseSubject : `Re: ${baseSubject}`;
+
+      const inReplyTo = target.message_id_header || undefined;
+      const references =
+        [target.references_header, target.message_id_header].filter(Boolean).join(" ") || undefined;
+
+      const from = account.display_name
+        ? `${account.display_name} <${account.email}>`
+        : account.email;
+      const htmlBody = `<div>${escapeHtml(body).replace(/\n/g, "<br>")}</div>`;
+
+      const rawBase64Url = buildRawEmail({
+        from,
+        to,
+        subject,
+        htmlBody,
+        inReplyTo,
+        references,
+        threadId: parsed.threadId,
+      });
+
+      ctx.stageReply({
+        accountId: parsed.accountId,
+        threadId: parsed.threadId,
+        to,
+        subject,
+        bodyText: body,
+        rawBase64Url,
+      });
+
+      return `Draft prepared (to ${to.join(", ")}, subject "${subject}"). The user now has Send / Save / Cancel buttons — do not claim it was sent.`;
+    },
+  };
+}
+
+/** Build the tool set. Pass a context to enable the reply (write) path. */
+export function buildTools(ctx: AssistantContext = {}): AssistantTool[] {
+  return [listRecentThreads, readThread, buildProposeReply(ctx)];
 }
