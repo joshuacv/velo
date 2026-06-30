@@ -39,6 +39,10 @@ import {
 } from "./services/bundles/bundleManager";
 import { initNotifications } from "./services/notifications/notificationManager";
 import {
+  startAssistant,
+  stopAssistant,
+} from "./services/assistant/assistantManager";
+import {
   initGlobalShortcut,
   unregisterComposeShortcut,
 } from "./services/globalShortcut";
@@ -335,6 +339,11 @@ export default function App() {
         startQueueProcessor();
         startPreCacheManager();
 
+        // Start the phone assistant (Telegram) if configured & enabled
+        startAssistant().catch((err) =>
+          console.warn("Failed to start assistant:", err),
+        );
+
         // Initialize notifications
         await initNotifications();
 
@@ -373,6 +382,7 @@ export default function App() {
       stopBundleChecker();
       stopQueueProcessor();
       stopPreCacheManager();
+      stopAssistant();
       stopUpdateChecker();
       unregisterComposeShortcut();
       deepLinkCleanupRef.current?.();

@@ -35,6 +35,7 @@ import {
   ChevronUp,
   ChevronDown,
   RotateCcw,
+  Bot,
   type LucideIcon,
 } from "lucide-react";
 import { SignatureEditor } from "./SignatureEditor";
@@ -59,9 +60,10 @@ import { ALL_NAV_ITEMS } from "@/components/layout/Sidebar";
 import type { SidebarNavItem } from "@/stores/uiStore";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
+import { AssistantSettings } from "./AssistantSettings";
 import appIcon from "@/assets/icon.png";
 
-type SettingsTab = "general" | "notifications" | "composing" | "mail-rules" | "people" | "accounts" | "shortcuts" | "ai" | "about";
+type SettingsTab = "general" | "notifications" | "composing" | "mail-rules" | "people" | "accounts" | "shortcuts" | "ai" | "assistant" | "about";
 
 const tabs: { id: SettingsTab; label: string; icon: LucideIcon }[] = [
   { id: "general", label: "General", icon: Settings },
@@ -72,6 +74,7 @@ const tabs: { id: SettingsTab; label: string; icon: LucideIcon }[] = [
   { id: "accounts", label: "Accounts", icon: UserCircle },
   { id: "shortcuts", label: "Shortcuts", icon: Keyboard },
   { id: "ai", label: "AI", icon: Sparkles },
+  { id: "assistant", label: "Assistant", icon: Bot },
   { id: "about", label: "About", icon: Info },
 ];
 
@@ -1390,6 +1393,8 @@ export function SettingsPage() {
                   </Section>
                 </>
               )}
+
+              {activeTab === "assistant" && <AssistantSettings />}
 
               {activeTab === "about" && (
                 <>
