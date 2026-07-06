@@ -135,18 +135,83 @@ No build tools or programming knowledge required -- just download, install, and 
 
 ### Building from source
 
-For developers who want to build Velo themselves or contribute:
+Build an installable package on another computer from scratch. Steps below are for
+**Debian/Ubuntu-based Linux** (including Raspberry Pi OS); notes for macOS/Windows follow.
+
+**1. System dependencies** (Tauri's WebKit/GTK stack)
 
 ```bash
-git clone https://github.com/avihaymenahem/velo.git
-cd velo
-npm install
-npm run tauri dev
+sudo apt update
+sudo apt install -y \
+  libwebkit2gtk-4.1-dev build-essential curl wget file \
+  libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev \
+  pkg-config git ca-certificates
 ```
 
-**Prerequisites:** [Node.js](https://nodejs.org/) v18+, [Rust](https://www.rust-lang.org/tools/install), [Tauri v2 deps](https://v2.tauri.app/start/prerequisites/)
+**2. Rust** (stable)
 
-See [Development Guide](docs/development.md) for all commands, testing, and build instructions.
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source "$HOME/.cargo/env"      # or open a new terminal
+```
+
+**3. Node.js ≥ 20.19** (Vite requires it — Node 22 recommended)
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
+sudo apt install -y nodejs
+node --version                 # expect v22.x
+```
+
+**4. Clone and check out the branch**
+
+```bash
+git clone https://github.com/joshuacv/velo.git
+cd velo
+git checkout feat/phone-assistant
+```
+
+**5. Install deps and build**
+
+```bash
+npm ci
+npm run tauri build -- --bundles deb
+```
+
+`-- --bundles deb` builds just the `.deb` and skips the AppImage bundler (which needs
+`xdg-mime` plus extra downloads). Drop it to build every bundle format.
+
+**6. Result** — the installable package lands at:
+
+```
+src-tauri/target/release/bundle/deb/Velo_<version>_<arch>.deb
+```
+
+Install it (dependencies resolve automatically):
+
+```bash
+sudo apt install ./src-tauri/target/release/bundle/deb/Velo_*.deb
+```
+
+Or run the raw binary without installing: `./src-tauri/target/release/velo`.
+
+> **Timing:** the first build compiles the full Rust dependency tree (~10–30 min
+> natively, depending on the machine); later builds are incremental and fast. Low-RAM
+> machines (e.g. a 1 GB Raspberry Pi) may not have enough memory to compile — build on a
+> more capable machine of the **same CPU architecture** and copy the `.deb` over, or
+> cross-compile.
+
+**Other platforms**
+
+- **macOS:** skip step 1; install Xcode Command Line Tools (`xcode-select --install`),
+  then Rust + Node as above. `npm run tauri build` produces a `.dmg`/`.app`.
+- **Windows:** install Visual Studio C++ Build Tools + WebView2, Rust, and Node, then
+  `npm run tauri build` for an `.msi`/`.exe`.
+
+**Prerequisites summary:** [Node.js](https://nodejs.org/) ≥ 20.19, [Rust](https://www.rust-lang.org/tools/install), [Tauri v2 deps](https://v2.tauri.app/start/prerequisites/).
+
+For development (hot-reload) instead of a release build, use `npm run tauri dev`. See the
+[Development Guide](docs/development.md) for all commands, testing, and more.
 
 ---
 
