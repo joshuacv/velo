@@ -141,6 +141,7 @@ export function SettingsPage() {
   const [clearingCache, setClearingCache] = useState(false);
   const [reauthStatus, setReauthStatus] = useState<Record<string, "idle" | "authorizing" | "done" | "error">>({});
   const [resyncStatus, setResyncStatus] = useState<Record<string, "idle" | "syncing" | "done" | "error">>({});
+  const [expandedImapAccountId, setExpandedImapAccountId] = useState<string | null>(null);
   const [autoArchiveCategories, setAutoArchiveCategories] = useState<Set<string>>(() => new Set());
   const [smartNotifications, setSmartNotifications] = useState(true);
   const [notifyCategories, setNotifyCategories] = useState<Set<string>>(() => new Set(["Primary"]));
@@ -850,58 +851,79 @@ export function SettingsPage() {
               {activeTab === "accounts" && (
                 <>
                   <Section title="Mail Accounts">
-                    {accounts.filter((a) => a.provider !== "caldav").length === 0 ? (
+                    {accounts.filter((a) => a.provider !== "caldav" && a.provider !== "ics_url").length === 0 ? (
                       <p className="text-sm text-text-tertiary">
                         No mail accounts connected
                       </p>
                     ) : (
                       <div className="space-y-2">
-                        {accounts.filter((a) => a.provider !== "caldav").map((account) => {
+                        {accounts.filter((a) => a.provider !== "caldav" && a.provider !== "ics_url").map((account) => {
                           const providerLabel = account.provider === "imap" ? "IMAP" : "Gmail";
                           return (
                             <div
                               key={account.id}
-                              className="flex items-center justify-between py-2.5 px-4 bg-bg-secondary rounded-lg"
+                              className="bg-bg-secondary rounded-lg"
                             >
-                              <div>
-                                <div className="text-sm font-medium text-text-primary flex items-center gap-2">
-                                  {account.displayName ?? account.email}
-                                  <span className="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-bg-tertiary text-text-tertiary">
-                                    {providerLabel}
-                                  </span>
+                              <div className="flex items-center justify-between py-2.5 px-4">
+                                <div>
+                                  <div className="text-sm font-medium text-text-primary flex items-center gap-2">
+                                    {account.displayName ?? account.email}
+                                    <span className="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-bg-tertiary text-text-tertiary">
+                                      {providerLabel}
+                                    </span>
+                                  </div>
+                                  <div className="text-xs text-text-tertiary">
+                                    {account.email}
+                                  </div>
                                 </div>
-                                <div className="text-xs text-text-tertiary">
-                                  {account.email}
+                                <div className="flex items-center gap-3">
+                                  {account.provider === "imap" && (
+                                    <button
+                                      onClick={() =>
+                                        setExpandedImapAccountId((prev) =>
+                                          prev === account.id ? null : account.id,
+                                        )
+                                      }
+                                      className="text-xs text-accent hover:text-accent-hover transition-colors"
+                                    >
+                                      {expandedImapAccountId === account.id
+                                        ? "Hide settings"
+                                        : "View settings"}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleReauthorizeAccount(account.id, account.email)}
+                                    disabled={reauthStatus[account.id] === "authorizing"}
+                                    className="text-xs text-accent hover:text-accent-hover transition-colors disabled:opacity-50"
+                                  >
+                                    {reauthStatus[account.id] === "authorizing" && "Waiting..."}
+                                    {reauthStatus[account.id] === "done" && "Done!"}
+                                    {reauthStatus[account.id] === "error" && "Failed"}
+                                    {(!reauthStatus[account.id] || reauthStatus[account.id] === "idle") && "Re-authorize"}
+                                  </button>
+                                  <button
+                                    onClick={() => handleResyncAccount(account.id)}
+                                    disabled={resyncStatus[account.id] === "syncing"}
+                                    className="text-xs text-accent hover:text-accent-hover transition-colors disabled:opacity-50"
+                                  >
+                                    {resyncStatus[account.id] === "syncing" && "Resyncing..."}
+                                    {resyncStatus[account.id] === "done" && "Done!"}
+                                    {resyncStatus[account.id] === "error" && "Failed"}
+                                    {(!resyncStatus[account.id] || resyncStatus[account.id] === "idle") && "Resync"}
+                                  </button>
+                                  <button
+                                    onClick={() => handleRemoveAccount(account.id)}
+                                    className="text-xs text-danger hover:text-danger/80 transition-colors"
+                                  >
+                                    Remove
+                                  </button>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-3">
-                                <button
-                                  onClick={() => handleReauthorizeAccount(account.id, account.email)}
-                                  disabled={reauthStatus[account.id] === "authorizing"}
-                                  className="text-xs text-accent hover:text-accent-hover transition-colors disabled:opacity-50"
-                                >
-                                  {reauthStatus[account.id] === "authorizing" && "Waiting..."}
-                                  {reauthStatus[account.id] === "done" && "Done!"}
-                                  {reauthStatus[account.id] === "error" && "Failed"}
-                                  {(!reauthStatus[account.id] || reauthStatus[account.id] === "idle") && "Re-authorize"}
-                                </button>
-                                <button
-                                  onClick={() => handleResyncAccount(account.id)}
-                                  disabled={resyncStatus[account.id] === "syncing"}
-                                  className="text-xs text-accent hover:text-accent-hover transition-colors disabled:opacity-50"
-                                >
-                                  {resyncStatus[account.id] === "syncing" && "Resyncing..."}
-                                  {resyncStatus[account.id] === "done" && "Done!"}
-                                  {resyncStatus[account.id] === "error" && "Failed"}
-                                  {(!resyncStatus[account.id] || resyncStatus[account.id] === "idle") && "Resync"}
-                                </button>
-                                <button
-                                  onClick={() => handleRemoveAccount(account.id)}
-                                  className="text-xs text-danger hover:text-danger/80 transition-colors"
-                                >
-                                  Remove
-                                </button>
-                              </div>
+                              {account.provider === "imap" && expandedImapAccountId === account.id && (
+                                <div className="px-4 pb-4 border-t border-border-primary">
+                                  <ImapAccountSettingsInline accountId={account.id} />
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -909,10 +931,10 @@ export function SettingsPage() {
                     )}
                   </Section>
 
-                  {accounts.some((a) => a.provider === "caldav") && (
+                  {accounts.some((a) => a.provider === "caldav" || a.provider === "ics_url") && (
                     <Section title="Calendar Accounts">
                       <div className="space-y-2">
-                        {accounts.filter((a) => a.provider === "caldav").map((account) => (
+                        {accounts.filter((a) => a.provider === "caldav" || a.provider === "ics_url").map((account) => (
                           <div
                             key={account.id}
                             className="flex items-center justify-between py-2.5 px-4 bg-bg-secondary rounded-lg"
@@ -921,12 +943,14 @@ export function SettingsPage() {
                               <div className="text-sm font-medium text-text-primary flex items-center gap-2">
                                 {account.displayName ?? account.email}
                                 <span className="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-accent/10 text-accent">
-                                  CalDAV
+                                  {account.provider === "ics_url" ? "Read-only feed" : "CalDAV"}
                                 </span>
                               </div>
-                              <div className="text-xs text-text-tertiary">
-                                {account.email}
-                              </div>
+                              {account.provider !== "ics_url" && (
+                                <div className="text-xs text-text-tertiary">
+                                  {account.email}
+                                </div>
+                              )}
                             </div>
                             <button
                               onClick={() => handleRemoveAccount(account.id)}
@@ -2035,6 +2059,35 @@ function CalDavSettingsInline({ account, onSaved }: { account: import("@/service
   if (!CalDav) return <div className="text-xs text-text-tertiary">Loading...</div>;
 
   return <CalDav account={account} onSaved={onSaved} />;
+}
+
+function ImapAccountSettingsInline({ accountId }: { accountId: string }) {
+  const [account, setAccount] = useState<import("@/services/db/accounts").DbAccount | null>(null);
+  const [ImapSettings, setImapSettings] = useState<
+    typeof import("@/components/settings/ImapAccountSettings").ImapAccountSettings | null
+  >(null);
+
+  const loadAccount = useCallback(() => {
+    import("@/services/db/accounts").then(({ getAccount }) => {
+      getAccount(accountId).then(setAccount);
+    });
+  }, [accountId]);
+
+  useEffect(() => {
+    loadAccount();
+  }, [loadAccount]);
+
+  useEffect(() => {
+    import("@/components/settings/ImapAccountSettings").then((m) =>
+      setImapSettings(() => m.ImapAccountSettings),
+    );
+  }, []);
+
+  if (!account || !ImapSettings) {
+    return <div className="text-xs text-text-tertiary py-3">Loading...</div>;
+  }
+
+  return <ImapSettings account={account} onSaved={loadAccount} />;
 }
 
 function SidebarNavEditor() {

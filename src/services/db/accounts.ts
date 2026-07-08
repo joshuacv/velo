@@ -220,6 +220,49 @@ export async function insertImapAccount(account: {
   );
 }
 
+export async function updateImapAccount(
+  accountId: string,
+  fields: {
+    imapHost: string;
+    imapPort: number;
+    imapSecurity: string;
+    smtpHost: string;
+    smtpPort: number;
+    smtpSecurity: string;
+    imapUsername?: string | null;
+    password?: string;
+    acceptInvalidCerts?: boolean;
+  },
+): Promise<void> {
+  const db = await getDb();
+  const params = [
+    fields.imapHost,
+    fields.imapPort,
+    fields.imapSecurity,
+    fields.smtpHost,
+    fields.smtpPort,
+    fields.smtpSecurity,
+    fields.imapUsername ?? null,
+    fields.acceptInvalidCerts ? 1 : 0,
+  ];
+  if (fields.password) {
+    const encPassword = await encryptValue(fields.password);
+    await db.execute(
+      `UPDATE accounts SET imap_host = $1, imap_port = $2, imap_security = $3,
+         smtp_host = $4, smtp_port = $5, smtp_security = $6, imap_username = $7,
+         accept_invalid_certs = $8, imap_password = $9, updated_at = unixepoch() WHERE id = $10`,
+      [...params, encPassword, accountId],
+    );
+  } else {
+    await db.execute(
+      `UPDATE accounts SET imap_host = $1, imap_port = $2, imap_security = $3,
+         smtp_host = $4, smtp_port = $5, smtp_security = $6, imap_username = $7,
+         accept_invalid_certs = $8, updated_at = unixepoch() WHERE id = $9`,
+      [...params, accountId],
+    );
+  }
+}
+
 export async function insertCalDavAccount(account: {
   id: string;
   email: string;

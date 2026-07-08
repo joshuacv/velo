@@ -7,6 +7,7 @@ import {
   deleteAccount,
   updateAccountTokens,
   updateAccountSyncState,
+  updateImapAccount,
 } from "./accounts";
 import { createMockGmailAccount, createMockImapAccount } from "@/test/mocks";
 
@@ -268,6 +269,70 @@ describe("accounts", () => {
       expect(sql).toContain("UPDATE accounts SET access_token");
       expect(params).toContain("enc:new-token");
       expect(params).toContain(1234567890);
+    });
+  });
+
+  describe("updateImapAccount", () => {
+    it("updates connection fields and re-encrypts password when provided", async () => {
+      mockExecute.mockResolvedValue(undefined);
+
+      await updateImapAccount("acc-imap", {
+        imapHost: "imap.new.com",
+        imapPort: 993,
+        imapSecurity: "ssl",
+        smtpHost: "smtp.new.com",
+        smtpPort: 465,
+        smtpSecurity: "ssl",
+        imapUsername: "custom-user",
+        password: "new-password",
+        acceptInvalidCerts: true,
+      });
+
+      expect(mockExecute).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockExecute.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain("UPDATE accounts SET imap_host");
+      expect(sql).toContain("imap_password = $9");
+      expect(params).toEqual([
+        "imap.new.com",
+        993,
+        "ssl",
+        "smtp.new.com",
+        465,
+        "ssl",
+        "custom-user",
+        1,
+        "enc:new-password",
+        "acc-imap",
+      ]);
+    });
+
+    it("leaves imap_password untouched when no password given", async () => {
+      mockExecute.mockResolvedValue(undefined);
+
+      await updateImapAccount("acc-imap", {
+        imapHost: "imap.new.com",
+        imapPort: 993,
+        imapSecurity: "ssl",
+        smtpHost: "smtp.new.com",
+        smtpPort: 465,
+        smtpSecurity: "ssl",
+        acceptInvalidCerts: false,
+      });
+
+      expect(mockExecute).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockExecute.mock.calls[0] as [string, unknown[]];
+      expect(sql).not.toContain("imap_password");
+      expect(params).toEqual([
+        "imap.new.com",
+        993,
+        "ssl",
+        "smtp.new.com",
+        465,
+        "ssl",
+        null,
+        0,
+        "acc-imap",
+      ]);
     });
   });
 
