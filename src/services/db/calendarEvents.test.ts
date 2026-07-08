@@ -221,18 +221,34 @@ describe("calendarEvents service", () => {
       expect(params).toEqual(["acc-1", 500, 2500, "cal-1", "cal-2"]);
     });
 
-    it("falls back to getCalendarEventsInRange when calendarIds is empty", async () => {
+    it("falls back to the unfiltered range query when the account has no calendars registered", async () => {
       const events = [makeEvent()];
+      mockDb.select.mockResolvedValueOnce([{ count: 0 }]);
       mockDb.select.mockResolvedValueOnce(events);
 
       const result = await getCalendarEventsInRangeMulti("acc-1", [], 500, 2500);
 
       expect(result).toEqual(events);
-      expect(mockDb.select).toHaveBeenCalledTimes(1);
-      const [sql, params] = mockDb.select.mock.calls[0] as [string, unknown[]];
+      expect(mockDb.select).toHaveBeenCalledTimes(2);
+      const [sql, params] = mockDb.select.mock.calls[1] as [string, unknown[]];
       // Should use the simple range query (no calendar_id filter)
       expect(sql).not.toContain("calendar_id IN");
       expect(sql).toContain("WHERE account_id = $1 AND start_time < $3 AND end_time > $2");
+      expect(params).toEqual(["acc-1", 500, 2500]);
+    });
+
+    it("returns only unassociated events when calendars exist but none are visible", async () => {
+      const events = [makeEvent({ calendar_id: null })];
+      mockDb.select.mockResolvedValueOnce([{ count: 2 }]);
+      mockDb.select.mockResolvedValueOnce(events);
+
+      const result = await getCalendarEventsInRangeMulti("acc-1", [], 500, 2500);
+
+      expect(result).toEqual(events);
+      expect(mockDb.select).toHaveBeenCalledTimes(2);
+      const [sql, params] = mockDb.select.mock.calls[1] as [string, unknown[]];
+      expect(sql).not.toContain("calendar_id IN");
+      expect(sql).toContain("calendar_id IS NULL");
       expect(params).toEqual(["acc-1", 500, 2500]);
     });
   });

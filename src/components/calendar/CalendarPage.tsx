@@ -134,10 +134,19 @@ export function CalendarPage() {
 
           const accountCals = await getCalendarsForAccount(account.id);
           const visible = accountCals.filter((c) => c.is_visible);
+          // Fetch each calendar independently — one calendar failing to respond
+          // (e.g. a resource/shared calendar the account can't reach) shouldn't
+          // block the rest of the account's calendars from syncing.
           for (const cal of visible) {
-            const apiEvents = await provider.fetchEvents(cal.remote_id, start.toISOString(), end.toISOString());
-            for (const event of apiEvents) {
-              await upsertCalendarEventFromProvider(account.id, cal.id, event);
+            try {
+              const apiEvents = await provider.fetchEvents(cal.remote_id, start.toISOString(), end.toISOString());
+              for (const event of apiEvents) {
+                await upsertCalendarEventFromProvider(account.id, cal.id, event);
+              }
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              console.error(`Failed to load events for calendar "${cal.display_name}" (${account.email}):`, err);
+              lastError = `${account.displayName ?? account.email} → ${cal.display_name ?? "calendar"}: ${message}`;
             }
           }
         } catch (err) {

@@ -82,10 +82,27 @@ export async function getCalendarEventsInRangeMulti(
   startTime: number,
   endTime: number,
 ): Promise<DbCalendarEvent[]> {
-  if (calendarIds.length === 0) {
-    return getCalendarEventsInRange(accountId, startTime, endTime);
-  }
   const db = await getDb();
+  if (calendarIds.length === 0) {
+    // Empty list is ambiguous: it means either "this account has no
+    // calendars synced yet" (show legacy/unassociated events) or "the user
+    // explicitly hid every calendar for this account" (show nothing). Only
+    // fall back to the unfiltered query in the former case — otherwise a
+    // fully-hidden account would incorrectly show every event again.
+    const rows = await db.select<{ count: number }[]>(
+      "SELECT COUNT(*) as count FROM calendars WHERE account_id = $1",
+      [accountId],
+    );
+    if ((rows[0]?.count ?? 0) === 0) {
+      return getCalendarEventsInRange(accountId, startTime, endTime);
+    }
+    return db.select<DbCalendarEvent[]>(
+      `SELECT * FROM calendar_events
+       WHERE account_id = $1 AND start_time < $3 AND end_time > $2 AND calendar_id IS NULL
+       ORDER BY start_time ASC`,
+      [accountId, startTime, endTime],
+    );
+  }
   const placeholders = calendarIds.map((_, i) => `$${i + 4}`).join(", ");
   return db.select<DbCalendarEvent[]>(
     `SELECT * FROM calendar_events
