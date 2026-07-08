@@ -6,6 +6,8 @@ import {
   saveAssistantConfig,
   restartAssistant,
   testToken,
+  onAssistantStatus,
+  type AssistantStatus,
 } from "@/services/assistant/assistantManager";
 
 /**
@@ -19,12 +21,21 @@ export function AssistantSettings() {
   const [saved, setSaved] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [status, setStatus] = useState<AssistantStatus>("stopped");
+  const [statusDetail, setStatusDetail] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     void getAssistantConfig().then((cfg) => {
       setEnabled(cfg.enabled);
       setToken(cfg.token ?? "");
       setAllowedUserId(cfg.allowedUserId ?? "");
+    });
+  }, []);
+
+  useEffect(() => {
+    return onAssistantStatus((s, detail) => {
+      setStatus(s);
+      setStatusDetail(detail);
     });
   }, []);
 
@@ -51,11 +62,38 @@ export function AssistantSettings() {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-text-tertiary mb-3">
           Phone Assistant (Telegram)
         </h3>
-        <p className="text-xs text-text-tertiary mb-4 leading-relaxed">
-          Chat with your inbox from your phone via a Telegram bot. Right now it's
-          read-only — it can read and summarize mail, but not send. Velo must be
-          running (it can stay minimized in the tray) for the bot to respond.
+        <p className="text-xs text-text-tertiary mb-3 leading-relaxed">
+          Chat with your inbox and calendar from your phone via a Telegram bot. It can
+          read/summarize mail and calendar events, and draft replies or new events —
+          but nothing is sent or added without your confirmation via buttons in the
+          chat. Velo must be running (it can stay minimized in the tray) for the bot
+          to respond.
         </p>
+
+        <div className="flex items-center gap-2 mb-4 text-xs">
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 ${
+              status === "running"
+                ? "bg-success"
+                : status === "error"
+                  ? "bg-danger"
+                  : "bg-text-tertiary"
+            }`}
+          />
+          <span
+            className={
+              status === "running"
+                ? "text-success"
+                : status === "error"
+                  ? "text-danger"
+                  : "text-text-tertiary"
+            }
+          >
+            {status === "running" && "Running — listening for messages"}
+            {status === "stopped" && `Stopped${statusDetail ? ` — ${statusDetail}` : ""}`}
+            {status === "error" && `Error — ${statusDetail ?? "getUpdates failed"}`}
+          </span>
+        </div>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">

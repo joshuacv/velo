@@ -1,16 +1,19 @@
 /**
- * Email tools the assistant agent can call.
+ * Email and calendar tools the assistant agent can call.
  *
- * Read tools query Velo's *local cache* (already synced). The write path
- * (propose_reply) never sends or saves on its own — it *stages* a reply for the
- * user to confirm with buttons in Telegram. Actual send/save runs only on an
- * explicit tap, through Velo's offline-aware emailActions.
+ * Read tools query Velo's *local cache* (already synced). The write paths
+ * (propose_reply, propose_event) never send/save/create anything on their
+ * own — they *stage* a draft for the user to confirm with buttons in
+ * Telegram. The actual send/save/create runs only on an explicit tap.
  */
 import type Anthropic from "@anthropic-ai/sdk";
 import { getAllAccounts, getAccount } from "@/services/db/accounts";
 import { getThreadsForAccount } from "@/services/db/threads";
 import { getMessagesForThread } from "@/services/db/messages";
 import { buildRawEmail } from "@/utils/emailBuilder";
+import { getCalendarsForAccount, getCalendarById } from "@/services/db/calendars";
+import { getCalendarEventsInRangeMulti } from "@/services/db/calendarEvents";
+import { hasCalendarSupport } from "@/services/calendar/providerFactory";
 
 /** A reply composed and ready to send/save, awaiting user confirmation. */
 export interface StagedReply {
@@ -22,9 +25,24 @@ export interface StagedReply {
   rawBase64Url: string;
 }
 
+/** A calendar event drafted and ready to create, awaiting user confirmation. */
+export interface StagedEvent {
+  accountId: string;
+  calendarDbId: string | null;
+  calendarRemoteId: string;
+  summary: string;
+  description?: string;
+  location?: string;
+  startTime: string; // ISO 8601
+  endTime: string; // ISO 8601
+  isAllDay: boolean;
+}
+
 export interface AssistantContext {
   /** Called by propose_reply to hand a finished draft to the manager for confirmation. */
   stageReply?: (reply: StagedReply) => void;
+  /** Called by propose_event to hand a finished event draft to the manager for confirmation. */
+  stageEvent?: (event: StagedEvent) => void;
 }
 
 export interface AssistantTool {
@@ -43,6 +61,19 @@ function toIso(ts: number | null | undefined): string {
 async function mailAccounts() {
   const all = await getAllAccounts();
   return all.filter((a) => a.provider !== "caldav");
+}
+
+/** Accounts that expose a calendar (Gmail, CalDAV, or a read-only ICS subscription). */
+async function calendarAccounts() {
+  const all = await getAllAccounts();
+  const flags = await Promise.all(all.map(async (a) => [a, await hasCalendarSupport(a.id)] as const));
+  return flags.filter(([, ok]) => ok).map(([a]) => a);
+}
+
+function splitRef(ref: string): [string, string] | null {
+  const idx = ref.indexOf(REF_SEP);
+  if (idx === -1) return null;
+  return [ref.slice(0, idx), ref.slice(idx + REF_SEP.length)];
 }
 
 function escapeHtml(s: string): string {
@@ -204,7 +235,187 @@ function buildProposeReply(ctx: AssistantContext): AssistantTool {
   };
 }
 
-/** Build the tool set. Pass a context to enable the reply (write) path. */
+const listCalendars: AssistantTool = {
+  def: {
+    name: "list_calendars",
+    description:
+      "List the user's connected calendars across all accounts. Returns each calendar's `ref` " +
+      "(accountId::calendarId), display name, account, whether it's primary, and whether it's " +
+      "read-only (a URL subscription — can't add events there). Use a `ref` with propose_event " +
+      "to target a specific calendar.",
+    input_schema: { type: "object", properties: {} },
+  },
+  async run() {
+    const accounts = await calendarAccounts();
+    if (accounts.length === 0) return "No calendar accounts connected.";
+    const out: Array<Record<string, unknown>> = [];
+    for (const acct of accounts) {
+      const cals = await getCalendarsForAccount(acct.id);
+      for (const cal of cals) {
+        out.push({
+          ref: `${acct.id}${REF_SEP}${cal.id}`,
+          account: acct.display_name || acct.email,
+          name: cal.display_name ?? "Calendar",
+          primary: !!cal.is_primary,
+          readOnly: acct.provider === "ics_url",
+        });
+      }
+    }
+    if (out.length === 0) return "No calendars found yet — they sync shortly after connecting an account.";
+    return JSON.stringify(out, null, 2);
+  },
+};
+
+const listCalendarEvents: AssistantTool = {
+  def: {
+    name: "list_calendar_events",
+    description:
+      "List calendar events across all connected calendars within a date range. Defaults to " +
+      "today through the next 7 days if start/end aren't given. Dates are ISO 8601 " +
+      "(e.g. 2026-07-08 or 2026-07-08T00:00:00). Use this to answer questions about what's on " +
+      "the calendar and to summarize upcoming events.",
+    input_schema: {
+      type: "object",
+      properties: {
+        start: { type: "string", description: "Start of range, ISO 8601. Defaults to the start of today." },
+        end: { type: "string", description: "End of range, ISO 8601. Defaults to 7 days after start." },
+      },
+    },
+  },
+  async run(input) {
+    const now = new Date();
+    const startDate = input.start
+      ? new Date(String(input.start))
+      : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (isNaN(startDate.getTime())) return "Invalid start date.";
+    const endDate = input.end
+      ? new Date(String(input.end))
+      : new Date(startDate.getTime() + 7 * 86400 * 1000);
+    if (isNaN(endDate.getTime())) return "Invalid end date.";
+
+    const startTs = Math.floor(startDate.getTime() / 1000);
+    const endTs = Math.floor(endDate.getTime() / 1000);
+
+    const accounts = await calendarAccounts();
+    if (accounts.length === 0) return "No calendar accounts connected.";
+
+    const out: Array<Record<string, unknown>> = [];
+    for (const acct of accounts) {
+      const cals = await getCalendarsForAccount(acct.id);
+      const visibleIds = cals.filter((c) => c.is_visible).map((c) => c.id);
+      const events = await getCalendarEventsInRangeMulti(acct.id, visibleIds, startTs, endTs);
+      const calById = new Map(cals.map((c) => [c.id, c]));
+      for (const e of events) {
+        const cal = e.calendar_id ? calById.get(e.calendar_id) : undefined;
+        out.push({
+          summary: e.summary || "(no title)",
+          start: toIso(e.start_time),
+          end: toIso(e.end_time),
+          allDay: !!e.is_all_day,
+          location: e.location || undefined,
+          calendar: cal?.display_name ?? "Calendar",
+          account: acct.display_name || acct.email,
+        });
+      }
+    }
+    out.sort((a, b) => String(a.start).localeCompare(String(b.start)));
+    if (out.length === 0) return "No events found in that range.";
+    return JSON.stringify(out, null, 2);
+  },
+};
+
+function buildProposeEvent(ctx: AssistantContext): AssistantTool {
+  return {
+    def: {
+      name: "propose_event",
+      description:
+        "Draft a new calendar event and present it to the user for confirmation. This does NOT " +
+        "create the event — the user gets Add / Cancel buttons and decides. Pass a calendar `ref` " +
+        "from list_calendars to target a specific calendar (optional — defaults to the first " +
+        "writable calendar). Times are ISO 8601 with a timezone offset or Z, e.g. " +
+        "2026-07-08T15:00:00Z.",
+      input_schema: {
+        type: "object",
+        properties: {
+          ref: { type: "string", description: "Calendar reference (accountId::calendarId) from list_calendars. Optional." },
+          summary: { type: "string", description: "Event title." },
+          description: { type: "string", description: "Event description (optional)." },
+          location: { type: "string", description: "Event location (optional)." },
+          startTime: { type: "string", description: "Start time, ISO 8601." },
+          endTime: { type: "string", description: "End time, ISO 8601." },
+          isAllDay: { type: "boolean", description: "Whether this is an all-day event (optional, default false)." },
+        },
+        required: ["summary", "startTime", "endTime"],
+      },
+    },
+    async run(input) {
+      if (!ctx.stageEvent) return "Adding events isn't available in this context.";
+      const summary = String(input.summary ?? "").trim();
+      if (!summary) return "Event needs a title.";
+      const startTime = String(input.startTime ?? "");
+      const endTime = String(input.endTime ?? "");
+      if (isNaN(new Date(startTime).getTime()) || isNaN(new Date(endTime).getTime())) {
+        return "Invalid startTime/endTime — use ISO 8601 format.";
+      }
+
+      let targetAccountId: string | undefined;
+      let calendarDbId: string | null = null;
+      let calendarRemoteId = "primary";
+
+      if (input.ref) {
+        const parsed = splitRef(String(input.ref));
+        if (!parsed) return "Invalid calendar ref. Expected accountId::calendarId.";
+        const [refAccountId, calendarId] = parsed;
+        const cal = await getCalendarById(calendarId);
+        if (!cal || cal.account_id !== refAccountId) return "That calendar wasn't found.";
+        const account = await getAccount(refAccountId);
+        if (account?.provider === "ics_url") return "That calendar is read-only (a URL subscription) — pick a different one.";
+        targetAccountId = refAccountId;
+        calendarDbId = cal.id;
+        calendarRemoteId = cal.remote_id;
+      } else {
+        // Default: primary calendar of the first writable (non-read-only) connected account.
+        const accounts = await calendarAccounts();
+        for (const acct of accounts) {
+          if (acct.provider === "ics_url") continue;
+          const cals = await getCalendarsForAccount(acct.id);
+          const primary = cals.find((c) => c.is_primary) ?? cals[0];
+          if (primary) {
+            targetAccountId = acct.id;
+            calendarDbId = primary.id;
+            calendarRemoteId = primary.remote_id;
+            break;
+          }
+        }
+      }
+
+      if (!targetAccountId) return "No writable calendar available to add this event to.";
+
+      ctx.stageEvent({
+        accountId: targetAccountId,
+        calendarDbId,
+        calendarRemoteId,
+        summary,
+        description: input.description ? String(input.description) : undefined,
+        location: input.location ? String(input.location) : undefined,
+        startTime,
+        endTime,
+        isAllDay: input.isAllDay === true,
+      });
+
+      return `Event drafted: "${summary}" (${startTime} to ${endTime}). The user now has Add / Cancel buttons — do not claim it was created.`;
+    },
+  };
+}
+
+/** Build the tool set. Pass a context to enable the reply/event (write) paths. */
 export function buildTools(ctx: AssistantContext = {}): AssistantTool[] {
-  return [listRecentThreads, readThread, buildProposeReply(ctx)];
+  return [
+    listRecentThreads,
+    readThread,
+    buildProposeReply(ctx),
+    listCalendars,
+    listCalendarEvents,
+    buildProposeEvent(ctx),
+  ];
 }
