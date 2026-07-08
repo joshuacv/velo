@@ -46,7 +46,7 @@ Most email clients are slow, bloated, or send your data to someone else's server
 
 ### Email
 
-- Multi-account support: Gmail (API) and IMAP/SMTP (Outlook, Yahoo, iCloud, Fastmail, and more) with instant switching
+- Multi-account support: Gmail (API) and IMAP/SMTP (Outlook, Yahoo, iCloud, Fastmail, and more) with instant switching -- connection settings viewable and editable anytime
 - Threaded conversations with collapsible messages
 - Full-text search with Gmail-style operators (`from:`, `to:`, `subject:`, `has:attachment`, `label:`, etc.)
 - Command palette (`/` or `Ctrl+K`) for quick actions
@@ -88,7 +88,17 @@ Thread summaries, smart reply suggestions, AI compose & reply, text transform (i
 
 ### Calendar
 
-Google Calendar sync with month, week, and day views. Create events without leaving Velo.
+- Multi-provider: Google Calendar (full read/write), CalDAV (full read/write, works with any standalone or IMAP-linked CalDAV server), and read-only ICS/webcal feed subscriptions
+- Unified view merges calendars from every connected account into one month/week/day view
+- Per-calendar visibility toggles and editable colors in a sidebar panel
+- Create events without leaving Velo
+
+### Phone Assistant (Telegram)
+
+- Chat with your inbox and calendar from your phone via a Telegram bot -- summarize threads, ask about upcoming events, draft replies, and add calendar events on the go
+- Reads recent threads and calendar events across every connected account
+- Never sends or creates anything without your confirmation -- drafted replies and events are staged and presented with Send/Save/Cancel (or Add/Cancel) buttons in Telegram
+- Runs locally alongside Velo; single allow-listed Telegram user, no third-party server in between
 
 ### UI & Design
 
@@ -98,6 +108,7 @@ Google Calendar sync with month, week, and day views. Create events without leav
 - Configurable density and font scaling
 - Pop-out thread windows, custom titlebar, splash screen
 - System tray with taskbar badge count
+- Persistent bottom status bar for sync/offline status
 
 ### Privacy & Security
 
@@ -131,7 +142,11 @@ No build tools or programming knowledge required -- just download, install, and 
 
 **IMAP/SMTP:** Click "Add IMAP Account" in the account switcher. Enter your email and password -- Velo auto-discovers server settings for popular providers (Outlook, Yahoo, iCloud, Fastmail, etc.). For other providers, enter IMAP/SMTP server details manually. No Google Cloud project needed.
 
+**Calendar-only (CalDAV / ICS):** In the account switcher, choose "CalDAV (Calendar Only)" to connect iCloud, Fastmail, Nextcloud, or any CalDAV server, or "Subscribe by URL (Read-only)" for a public `.ics`/webcal feed — no email account required either way.
+
 **AI (optional):** Add an API key for [Anthropic](https://console.anthropic.com/), [OpenAI](https://platform.openai.com/), or [Google Gemini](https://aistudio.google.com/) in Settings. Then select which model to use for each provider.
+
+**Phone assistant (optional):** Create a Telegram bot via [@BotFather](https://t.me/BotFather), then enter its token and your Telegram user ID in Settings → Assistant.
 
 ### Building from source
 
@@ -221,10 +236,11 @@ For development (hot-reload) instead of a release build, use `npm run tauri dev`
 |--|--|
 | **Framework** | Tauri v2 (Rust) + React 19 + TypeScript |
 | **Styling** | Tailwind CSS v4 |
-| **State** | Zustand 5 (8 stores) |
+| **State** | Zustand 5 (9 stores) |
 | **Editor** | TipTap v3 |
 | **Email** | Gmail API, IMAP/SMTP (via async-imap + lettre in Rust) |
-| **Database** | SQLite + FTS5 (33 tables) |
+| **Calendar** | Google Calendar API, CalDAV (tsdav), ICS/webcal feeds |
+| **Database** | SQLite + FTS5 (35 tables) |
 | **AI** | Claude, GPT, Gemini |
 | **Testing** | Vitest + Testing Library |
 
