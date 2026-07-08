@@ -227,8 +227,8 @@ async function syncAccountInternal(accountId: string): Promise<void> {
 
     console.log(`[syncManager] Syncing account ${accountId} (provider=${account.provider}, history_id=${account.history_id ?? "null"})`);
 
-    if (account.provider === "caldav") {
-      // CalDAV-only accounts — skip email sync, only sync calendar
+    if (account.provider === "caldav" || account.provider === "ics_url") {
+      // Calendar-only accounts (CalDAV or read-only ICS feed) — skip email sync
       await syncCalendarForAccount(accountId);
       statusCallback?.(accountId, "done");
       return;
