@@ -1,3 +1,4 @@
+import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { DAVClient, type DAVCalendar, type DAVObject } from "tsdav";
 import type {
   CalendarProvider,
@@ -36,6 +37,11 @@ export class CalDAVProvider implements CalendarProvider {
       credentials: { username, password },
       authMethod: "Basic",
       defaultAccountType: "caldav",
+      // Route through Tauri's http plugin (Rust-side) instead of the webview's
+      // native fetch — the CSP connect-src allowlist can't cover arbitrary
+      // user-supplied CalDAV server hosts, so native fetch fails with a
+      // generic "Load failed" error for any server not on that list.
+      fetch: tauriFetch,
     });
 
     await this.client.login();

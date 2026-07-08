@@ -4,6 +4,12 @@ vi.mock("tsdav", () => ({
   DAVClient: vi.fn(),
 }));
 
+// Requests are routed through the Tauri http plugin (bypasses webview CSP for
+// arbitrary CalDAV server hosts); delegate to global fetch so tests can stub it.
+vi.mock("@tauri-apps/plugin-http", () => ({
+  fetch: (...args: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...args),
+}));
+
 describe("discoverCalDavSettings", () => {
   afterEach(() => {
     vi.restoreAllMocks();
