@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.4.22](https://github.com/joshuacv/velo/compare/velo-v0.4.21...velo-v0.4.22) (2026-07-08)
+
+
+### Features
+
+* **assistant:** forward activity logs to terminal, add calendar tools ([8fc4a18](https://github.com/joshuacv/velo/commit/8fc4a18817d78e6c409fcdb39082a662cc3e35b8))
+* **assistant:** read-only Telegram email assistant (slice 1) ([40c3c3d](https://github.com/joshuacv/velo/commit/40c3c3d5cda0fa458481951d03c01874499742ca))
+* **assistant:** reply drafting with send/save confirmation (slice 2) ([9aab42d](https://github.com/joshuacv/velo/commit/9aab42d8ee85c6e01673e6e8e3d1b0914c78ca79))
+* **calendar:** add read-only ICS/webcal calendar subscriptions ([b562597](https://github.com/joshuacv/velo/commit/b5625972368e648c8e6782d7de40f7dfd3ca4dff))
+* **calendar:** route ics_url accounts to calendar-only sync ([f9db89c](https://github.com/joshuacv/velo/commit/f9db89c165c4d1c9d54a5caa5e14ba1caa789c02))
+* **calendar:** unified multi-account view with visibility toggles and editable colors ([2525548](https://github.com/joshuacv/velo/commit/2525548b413c92b99f1561f7ad5ec7391520079d))
+* **ci:** build arm64 releases for Raspberry Pi, repoint updater to this fork ([a002b2d](https://github.com/joshuacv/velo/commit/a002b2d16c502b3263a9ef7a3060acbd4919596d))
+* **settings:** add IMAP/SMTP account settings editor ([5a01f4f](https://github.com/joshuacv/velo/commit/5a01f4f30a7d3ce4a52396c7222aac4beaca7755))
+* **sync:** add "all time" sync period to fetch entire mailbox ([066bd63](https://github.com/joshuacv/velo/commit/066bd632f985e2357e59b0a872425b6e0488a3e0))
+
+
+### Bug Fixes
+
+* **ai:** replace retired Claude model IDs in the model picker ([1791347](https://github.com/joshuacv/velo/commit/179134785e13518e2d227db70691d2803f653919))
+* **assistant:** search every calendar, not just visible ones ([0bd1800](https://github.com/joshuacv/velo/commit/0bd18004443d9c6127812175cdce795e389693a8))
+* bind OAuth server to 127.0.0.1 instead of localhost ([ec47a7a](https://github.com/joshuacv/velo/commit/ec47a7a5095bb5deffc24e9b6812e39107508dbe))
+* **calendar:** don't resurrect hidden calendars' events when all of an account's calendars are unchecked ([1c497e9](https://github.com/joshuacv/velo/commit/1c497e9dba82bee7d7beda088e529aa19d5d1cdf))
+* **calendar:** route CalDAV requests through Tauri's http plugin ([0d3728b](https://github.com/joshuacv/velo/commit/0d3728b1a6c63ff477e90abf32a50ff8e6132c37))
+* improve sync status bar UX ([dc76dd7](https://github.com/joshuacv/velo/commit/dc76dd7e60fec0460a39a4ed5c5427723a52ad32))
+* **sync:** serialize DB writes and drop unsupported transactions ([329e250](https://github.com/joshuacv/velo/commit/329e250932a27363520a1d7df587e3bbb1056a55))
+* **ui:** replace floating sync toast with a persistent status bar ([c258141](https://github.com/joshuacv/velo/commit/c2581412e1fa2d4c0558849bf7d590b18dfb2e8e))
+
 ## [0.4.21](https://github.com/avihaymenahem/velo/compare/velo-v0.4.20...velo-v0.4.21) (2026-02-27)
 
 
