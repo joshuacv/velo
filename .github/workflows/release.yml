@@ -74,7 +74,8 @@ jobs:
             patchelf \
             libssl-dev \
             libgtk-3-dev \
-            libayatana-appindicator3-dev
+            libayatana-appindicator3-dev \
+            xdg-utils
 
       - run: npm ci
 
