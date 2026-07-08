@@ -113,6 +113,20 @@ describe("list_calendar_events", () => {
     });
   });
 
+  it("searches calendars hidden from the sidebar too — is_visible only affects the Calendar page", async () => {
+    vi.mocked(getAllAccounts).mockResolvedValue([GOOGLE_ACCOUNT] as never);
+    vi.mocked(hasCalendarSupport).mockResolvedValue(true);
+    vi.mocked(getCalendarsForAccount).mockResolvedValue([
+      { id: "cal-1", account_id: "acc-google", display_name: "Work", is_visible: 1 } as never,
+      { id: "cal-2", account_id: "acc-google", display_name: "Hidden", is_visible: 0 } as never,
+    ]);
+    vi.mocked(getCalendarEventsInRangeMulti).mockResolvedValue([]);
+
+    await findTool("list_calendar_events").run({});
+
+    expect(getCalendarEventsInRangeMulti).toHaveBeenCalledWith("acc-google", ["cal-1", "cal-2"], expect.any(Number), expect.any(Number));
+  });
+
   it("rejects an invalid start date", async () => {
     const result = await findTool("list_calendar_events").run({ start: "not-a-date" });
     expect(result).toBe("Invalid start date.");

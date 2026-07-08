@@ -301,9 +301,12 @@ const listCalendarEvents: AssistantTool = {
 
     const out: Array<Record<string, unknown>> = [];
     for (const acct of accounts) {
+      // Search every calendar regardless of the sidebar's visibility toggle —
+      // is_visible only controls what's rendered on the Calendar page, not
+      // what the assistant can find.
       const cals = await getCalendarsForAccount(acct.id);
-      const visibleIds = cals.filter((c) => c.is_visible).map((c) => c.id);
-      const events = await getCalendarEventsInRangeMulti(acct.id, visibleIds, startTs, endTs);
+      const allIds = cals.map((c) => c.id);
+      const events = await getCalendarEventsInRangeMulti(acct.id, allIds, startTs, endTs);
       const calById = new Map(cals.map((c) => [c.id, c]));
       for (const e of events) {
         const cal = e.calendar_id ? calById.get(e.calendar_id) : undefined;
