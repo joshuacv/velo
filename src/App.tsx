@@ -66,6 +66,7 @@ import { getGmailClient } from "./services/gmail/tokenManager";
 import { invoke } from "@tauri-apps/api/core";
 import { DndProvider } from "./components/dnd/DndProvider";
 import { TitleBar } from "./components/layout/TitleBar";
+import { StatusBar } from "./components/layout/StatusBar";
 import { useShortcutStore } from "./stores/shortcutStore";
 import { getIncompleteTaskCount } from "./services/db/tasks";
 import { useTaskStore } from "./stores/taskStore";
@@ -316,7 +317,7 @@ export default function App() {
 
         // Fetch send-as aliases for each active email account (skip CalDAV-only)
         const activeIds = mapped.filter((a) => a.isActive).map((a) => a.id);
-        const emailAccountIds = mapped.filter((a) => a.isActive && a.provider !== "caldav").map((a) => a.id);
+        const emailAccountIds = mapped.filter((a) => a.isActive && a.provider !== "caldav" && a.provider !== "ics_url").map((a) => a.id);
         for (const accountId of emailAccountIds) {
           try {
             const client = await getGmailClient(accountId);
@@ -521,8 +522,8 @@ export default function App() {
       // timer so it doesn't queue behind delta syncs for existing accounts.
       syncAccount(newest.id);
 
-      // Fetch send-as aliases in the background (non-blocking, skip CalDAV-only accounts)
-      if (newest.provider !== "caldav") {
+      // Fetch send-as aliases in the background (non-blocking, skip calendar-only accounts)
+      if (newest.provider !== "caldav" && newest.provider !== "ics_url") {
         getGmailClient(newest.id)
           .then((client) => fetchSendAsAliases(client, newest.id))
           .catch((err) => console.warn(`Failed to fetch send-as aliases for new account:`, err));
@@ -573,16 +574,7 @@ export default function App() {
         </DndProvider>
       </div>
 
-      {/* Sync status bar */}
-      {syncStatus && (
-        <div
-          className={`fixed bottom-0 left-0 right-0 glass-panel text-white text-xs px-4 py-1.5 text-center z-40 animate-[slideUp_200ms_ease-out,fadeIn_200ms_ease-out] ${
-            syncStatus.startsWith("Sync failed") ? "bg-danger/90" : "bg-accent/90"
-          }`}
-        >
-          {syncStatus}
-        </div>
-      )}
+      <StatusBar syncStatus={syncStatus} />
 
       {showAddAccount && (
         <AddAccount
