@@ -65,9 +65,9 @@
       ]
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM0NjlFREYzMjVBRDYwRjMKUldUellLMGw4KzFwTkJ4RmJ0ejArWUNTZTEzT01SMnJveHc4K3ErNHVIdEVuYmZmYW94U295QzcK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVENUNDNUEwNzM5REU5MjAKUldRZzZaMXpvTVZjN1lnSm1YRnh6ak9xcHIzb1lWZ3NZaDNmUlUxdWQ3a3YvNllpMU9sSzRFbHMK",
       "endpoints": [
-        "https://github.com/avihaymenahem/velo/releases/latest/download/latest.json"
+        "https://github.com/joshuacv/velo/releases/latest/download/latest.json"
       ]
     },
     "deep-link": {

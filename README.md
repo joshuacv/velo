@@ -130,11 +130,15 @@ Thread summaries, smart reply suggestions, AI compose & reply, text transform (i
 
 ## Installation
 
+> This is a fork of the original [Velo](https://github.com/avihaymenahem/velo) project. Releases below are built from this fork and may include work-in-progress features (CalDAV/ICS calendars, a Telegram phone assistant, etc.) not yet in the upstream project.
+
 Download the latest release for your platform:
 
-**[Download Velo](https://github.com/avihaymenahem/velo/releases/latest)** -- Windows `.msi` / `.exe` &nbsp;&bull;&nbsp; macOS `.dmg` &nbsp;&bull;&nbsp; Linux `.deb` / `.AppImage`
+**[Download Velo](https://github.com/joshuacv/velo/releases/latest)** -- Windows `.msi` / `.exe` &nbsp;&bull;&nbsp; macOS `.dmg` &nbsp;&bull;&nbsp; Linux `.deb` / `.AppImage` (x86_64 and arm64/Raspberry Pi)
 
 No build tools or programming knowledge required -- just download, install, and run.
+
+**Raspberry Pi:** grab the `arm64.deb` (or the arm64 `.AppImage`) from the release page and install it on a 64-bit Raspberry Pi OS (Bookworm or newer) with `sudo apt install ./Velo_<version>_arm64.deb`. Built natively on GitHub's arm64 Linux runners, not cross-compiled or emulated.
 
 ### Account setup
 
@@ -149,6 +153,8 @@ No build tools or programming knowledge required -- just download, install, and 
 **Phone assistant (optional):** Create a Telegram bot via [@BotFather](https://t.me/BotFather), then enter its token and your Telegram user ID in Settings → Assistant.
 
 ### Building from source
+
+> Raspberry Pi users: a prebuilt arm64 `.deb`/`.AppImage` is available on the [releases page](https://github.com/joshuacv/velo/releases/latest) — you likely don't need to build from source at all. The steps below are for building on other hardware/OSes not covered by a release.
 
 Build an installable package on another computer from scratch. Steps below are for
 **Debian/Ubuntu-based Linux** (including Raspberry Pi OS); notes for macOS/Windows follow.
