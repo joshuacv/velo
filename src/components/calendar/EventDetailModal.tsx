@@ -12,11 +12,12 @@ interface EventDetailModalProps {
   event: DbCalendarEvent;
   calendars: DbCalendar[];
   accountId: string;
+  readOnly?: boolean;
   onClose: () => void;
   onUpdated: () => void;
 }
 
-export function EventDetailModal({ event, calendars, accountId, onClose, onUpdated }: EventDetailModalProps) {
+export function EventDetailModal({ event, calendars, accountId, readOnly, onClose, onUpdated }: EventDetailModalProps) {
   const [editing, setEditing] = useState(false);
   const [summary, setSummary] = useState(event.summary ?? "");
   const [description, setDescription] = useState(event.description ?? "");
@@ -153,6 +154,11 @@ export function EventDetailModal({ event, calendars, accountId, onClose, onUpdat
               style={{ backgroundColor: calendar.color ?? "var(--color-accent)" }}
             />
             {calendar.display_name}
+            {readOnly && (
+              <span className="text-[0.6rem] font-medium px-1.5 py-0.5 rounded-full bg-bg-tertiary text-text-tertiary">
+                Read-only
+              </span>
+            )}
           </div>
         )}
 
@@ -191,36 +197,44 @@ export function EventDetailModal({ event, calendars, accountId, onClose, onUpdat
           </div>
         )}
 
-        <div className="flex justify-between pt-2 border-t border-border-primary">
-          {confirmDelete ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-danger">Delete this event?</span>
-              <Button variant="danger" size="xs" onClick={handleDelete} disabled={deleting}>
-                {deleting ? "Deleting..." : "Yes, delete"}
+        {readOnly ? (
+          <div className="pt-2 border-t border-border-primary">
+            <span className="text-xs text-text-tertiary">
+              This calendar is read-only (subscribed by URL) — events can't be edited or deleted here.
+            </span>
+          </div>
+        ) : (
+          <div className="flex justify-between pt-2 border-t border-border-primary">
+            {confirmDelete ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-danger">Delete this event?</span>
+                <Button variant="danger" size="xs" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? "Deleting..." : "Yes, delete"}
+                </Button>
+                <Button variant="secondary" size="xs" onClick={() => setConfirmDelete(false)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Trash2 size={14} />}
+                onClick={() => setConfirmDelete(true)}
+              >
+                Delete
               </Button>
-              <Button variant="secondary" size="xs" onClick={() => setConfirmDelete(false)}>
-                Cancel
-              </Button>
-            </div>
-          ) : (
+            )}
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
-              icon={<Trash2 size={14} />}
-              onClick={() => setConfirmDelete(true)}
+              icon={<Pencil size={14} />}
+              onClick={() => setEditing(true)}
             >
-              Delete
+              Edit
             </Button>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={<Pencil size={14} />}
-            onClick={() => setEditing(true)}
-          >
-            Edit
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
     </Modal>
   );

@@ -1,12 +1,14 @@
 import type { DbCalendarEvent } from "@/services/db/calendarEvents";
+import { eventColorStyle } from "@/utils/calendarColor";
 
 interface EventCardProps {
   event: DbCalendarEvent;
+  color?: string | null;
   compact?: boolean;
   onClick?: () => void;
 }
 
-export function EventCard({ event, compact, onClick }: EventCardProps) {
+export function EventCard({ event, color, compact, onClick }: EventCardProps) {
   const startDate = new Date(event.start_time * 1000);
   const timeStr = event.is_all_day
     ? "All day"
@@ -16,6 +18,7 @@ export function EventCard({ event, compact, onClick }: EventCardProps) {
     return (
       <button
         onClick={onClick}
+        style={eventColorStyle(color)}
         className="w-full text-left text-[0.625rem] px-1 py-0.5 rounded bg-accent/10 text-accent truncate hover:bg-accent/20 transition-colors"
         title={event.summary ?? "Event"}
       >
@@ -30,7 +33,7 @@ export function EventCard({ event, compact, onClick }: EventCardProps) {
       className="w-full text-left px-3 py-2 rounded-md border border-border-secondary hover:bg-bg-hover transition-colors"
     >
       <div className="flex items-start gap-2">
-        <div className="w-1 h-full min-h-[24px] rounded-full bg-accent shrink-0" />
+        <div className="w-1 h-full min-h-[24px] rounded-full bg-accent shrink-0" style={color ? { backgroundColor: color } : undefined} />
         <div className="min-w-0">
           <div className="text-sm font-medium text-text-primary truncate">
             {event.summary ?? "(No title)"}

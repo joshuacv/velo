@@ -128,4 +128,92 @@ describe("CalendarList", () => {
 
     expect(screen.getByText("Calendar")).toBeInTheDocument();
   });
+
+  it("does not show account group headers when all calendars belong to one account", () => {
+    const calendars = [
+      makeCalendar({ id: "cal-1", account_id: "acc-1", display_name: "Work" }),
+      makeCalendar({ id: "cal-2", account_id: "acc-1", display_name: "Personal" }),
+    ];
+
+    render(
+      <CalendarList
+        calendars={calendars}
+        accountLabels={{ "acc-1": "me@gmail.com" }}
+        onVisibilityChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("me@gmail.com")).not.toBeInTheDocument();
+  });
+
+  it("groups calendars under an account label when multiple accounts are present", () => {
+    const calendars = [
+      makeCalendar({ id: "cal-1", account_id: "acc-1", display_name: "Work" }),
+      makeCalendar({ id: "cal-2", account_id: "acc-2", display_name: "University Schedule" }),
+    ];
+
+    render(
+      <CalendarList
+        calendars={calendars}
+        accountLabels={{ "acc-1": "me@gmail.com", "acc-2": "Uni Feed" }}
+        onVisibilityChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("me@gmail.com")).toBeInTheDocument();
+    expect(screen.getByText("Uni Feed")).toBeInTheDocument();
+    expect(screen.getByText("Work")).toBeInTheDocument();
+    expect(screen.getByText("University Schedule")).toBeInTheDocument();
+  });
+
+  it("does not render a color picker when onColorChange is not provided", () => {
+    const calendars = [makeCalendar({ id: "cal-1", display_name: "Work" })];
+
+    render(<CalendarList calendars={calendars} onVisibilityChange={vi.fn()} />);
+
+    expect(document.querySelector('input[type="color"]')).not.toBeInTheDocument();
+  });
+
+  it("renders a color picker per calendar reflecting its current color", () => {
+    const calendars = [
+      makeCalendar({ id: "cal-1", display_name: "Work", color: "#e63946" }),
+    ];
+
+    render(
+      <CalendarList calendars={calendars} onVisibilityChange={vi.fn()} onColorChange={vi.fn()} />,
+    );
+
+    const colorInput = document.querySelector('input[type="color"]') as HTMLInputElement;
+    expect(colorInput).toBeInTheDocument();
+    expect(colorInput.value).toBe("#e63946");
+  });
+
+  it("falls back to the default color in the picker when the calendar has none", () => {
+    const calendars = [
+      makeCalendar({ id: "cal-1", display_name: "Work", color: null }),
+    ];
+
+    render(
+      <CalendarList calendars={calendars} onVisibilityChange={vi.fn()} onColorChange={vi.fn()} />,
+    );
+
+    const colorInput = document.querySelector('input[type="color"]') as HTMLInputElement;
+    expect(colorInput.value).toBe("#6366f1");
+  });
+
+  it("calls onColorChange with the calendar id and new color", () => {
+    const onColorChange = vi.fn();
+    const calendars = [
+      makeCalendar({ id: "cal-1", display_name: "Work", color: "#e63946" }),
+    ];
+
+    render(
+      <CalendarList calendars={calendars} onVisibilityChange={vi.fn()} onColorChange={onColorChange} />,
+    );
+
+    const colorInput = document.querySelector('input[type="color"]') as HTMLInputElement;
+    fireEvent.change(colorInput, { target: { value: "#0b8043" } });
+
+    expect(onColorChange).toHaveBeenCalledWith("cal-1", "#0b8043");
+  });
 });

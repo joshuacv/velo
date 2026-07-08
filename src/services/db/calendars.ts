@@ -25,11 +25,14 @@ export async function upsertCalendar(calendar: {
 }): Promise<string> {
   const db = await getDb();
   const id = crypto.randomUUID();
+  // `color` is intentionally excluded from the UPDATE — it's set once from the
+  // provider on first discovery, then left alone so a user's manual edit (see
+  // updateCalendarColor) isn't clobbered by the next sync.
   await db.execute(
     `INSERT INTO calendars (id, account_id, provider, remote_id, display_name, color, is_primary)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT(account_id, remote_id) DO UPDATE SET
-       display_name = $5, color = $6, is_primary = $7, updated_at = unixepoch()`,
+       display_name = $5, is_primary = $7, updated_at = unixepoch()`,
     [id, calendar.accountId, calendar.provider, calendar.remoteId, calendar.displayName, calendar.color, calendar.isPrimary ? 1 : 0],
   );
   // Return the actual ID (could be existing row on conflict)
@@ -40,11 +43,27 @@ export async function upsertCalendar(calendar: {
   return existing?.id ?? id;
 }
 
+export async function updateCalendarColor(calendarId: string, color: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "UPDATE calendars SET color = $1, updated_at = unixepoch() WHERE id = $2",
+    [color, calendarId],
+  );
+}
+
 export async function getCalendarsForAccount(accountId: string): Promise<DbCalendar[]> {
   const db = await getDb();
   return db.select<DbCalendar[]>(
     "SELECT * FROM calendars WHERE account_id = $1 ORDER BY is_primary DESC, display_name ASC",
     [accountId],
+  );
+}
+
+/** All calendars across every connected account — powers the unified calendar view. */
+export async function getAllCalendars(): Promise<DbCalendar[]> {
+  const db = await getDb();
+  return db.select<DbCalendar[]>(
+    "SELECT * FROM calendars ORDER BY is_primary DESC, display_name ASC",
   );
 }
 

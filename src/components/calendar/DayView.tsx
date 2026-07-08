@@ -1,15 +1,17 @@
 import { useMemo } from "react";
 import type { DbCalendarEvent } from "@/services/db/calendarEvents";
+import { eventColorStyle } from "@/utils/calendarColor";
 
 interface DayViewProps {
   currentDate: Date;
   events: DbCalendarEvent[];
+  calendarColorById?: Record<string, string | null>;
   onEventClick: (event: DbCalendarEvent) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
-export function DayView({ currentDate, events, onEventClick }: DayViewProps) {
+export function DayView({ currentDate, events, calendarColorById, onEventClick }: DayViewProps) {
   const dayStart = new Date(currentDate);
   dayStart.setHours(0, 0, 0, 0);
 
@@ -60,6 +62,7 @@ export function DayView({ currentDate, events, onEventClick }: DayViewProps) {
             <button
               key={e.id}
               onClick={() => onEventClick(e)}
+              style={eventColorStyle(e.calendar_id ? calendarColorById?.[e.calendar_id] : undefined)}
               className="w-full text-left text-xs px-2 py-1.5 rounded bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
             >
               {e.summary ?? "Event"} · All day
@@ -84,6 +87,7 @@ export function DayView({ currentDate, events, onEventClick }: DayViewProps) {
                   <button
                     key={e.id}
                     onClick={() => onEventClick(e)}
+                    style={eventColorStyle(e.calendar_id ? calendarColorById?.[e.calendar_id] : undefined)}
                     className="w-full text-left text-xs px-2 py-1 rounded bg-accent/15 text-accent truncate hover:bg-accent/25 transition-colors mb-0.5"
                   >
                     {e.summary ?? "Event"}

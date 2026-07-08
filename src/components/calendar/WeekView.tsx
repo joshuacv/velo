@@ -1,16 +1,18 @@
 import { useMemo } from "react";
 import type { DbCalendarEvent } from "@/services/db/calendarEvents";
+import { eventColorStyle } from "@/utils/calendarColor";
 
 interface WeekViewProps {
   currentDate: Date;
   events: DbCalendarEvent[];
+  calendarColorById?: Record<string, string | null>;
   onEventClick: (event: DbCalendarEvent) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function WeekView({ currentDate, events, onEventClick }: WeekViewProps) {
+export function WeekView({ currentDate, events, calendarColorById, onEventClick }: WeekViewProps) {
   const weekStart = new Date(currentDate);
   weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   weekStart.setHours(0, 0, 0, 0);
@@ -90,6 +92,7 @@ export function WeekView({ currentDate, events, onEventClick }: WeekViewProps) {
                 <button
                   key={e.id}
                   onClick={() => onEventClick(e)}
+                  style={eventColorStyle(e.calendar_id ? calendarColorById?.[e.calendar_id] : undefined)}
                   className="w-full text-left text-[0.625rem] px-1 py-0.5 rounded bg-accent/10 text-accent truncate hover:bg-accent/20 transition-colors"
                 >
                   {e.summary ?? "Event"}
@@ -118,6 +121,7 @@ export function WeekView({ currentDate, events, onEventClick }: WeekViewProps) {
                       <button
                         key={e.id}
                         onClick={() => onEventClick(e)}
+                        style={eventColorStyle(e.calendar_id ? calendarColorById?.[e.calendar_id] : undefined)}
                         className="absolute inset-x-0.5 text-[0.625rem] px-1 py-0.5 rounded bg-accent/15 text-accent truncate hover:bg-accent/25 transition-colors"
                         title={e.summary ?? "Event"}
                       >

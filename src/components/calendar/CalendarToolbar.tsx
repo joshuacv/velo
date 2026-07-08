@@ -12,6 +12,8 @@ interface CalendarToolbarProps {
   onCreateEvent: () => void;
   onToggleCalendarList?: () => void;
   showCalendarListButton?: boolean;
+  createDisabled?: boolean;
+  createDisabledReason?: string;
 }
 
 export function CalendarToolbar({
@@ -24,6 +26,8 @@ export function CalendarToolbar({
   onCreateEvent,
   onToggleCalendarList,
   showCalendarListButton,
+  createDisabled,
+  createDisabledReason,
 }: CalendarToolbarProps) {
   const title = formatTitle(currentDate, view);
 
@@ -80,7 +84,9 @@ export function CalendarToolbar({
         </div>
         <button
           onClick={onCreateEvent}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-accent hover:bg-accent-hover rounded-md transition-colors"
+          disabled={createDisabled}
+          title={createDisabled ? createDisabledReason : undefined}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-accent hover:bg-accent-hover rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
         >
           <Plus size={14} />
           Create

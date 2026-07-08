@@ -21,8 +21,10 @@ import { getDb } from "@/services/db/connection";
 import {
   upsertCalendar,
   getCalendarsForAccount,
+  getAllCalendars,
   getVisibleCalendars,
   setCalendarVisibility,
+  updateCalendarColor,
   updateCalendarSyncToken,
   deleteCalendarsForAccount,
   getCalendarById,
@@ -102,6 +104,35 @@ describe("calendars service", () => {
 
       expect(id).toBe(MOCK_UUID);
     });
+
+    it("does not overwrite color on conflict, so a manual edit survives the next sync", async () => {
+      mockDb.select.mockResolvedValueOnce([{ id: "existing-id-123" }]);
+
+      await upsertCalendar({
+        accountId: "acc-1",
+        provider: "google",
+        remoteId: "remote-cal-1",
+        displayName: "Work",
+        color: "#0b8043",
+        isPrimary: false,
+      });
+
+      const [sql] = mockDb.execute.mock.calls[0] as [string, unknown[]];
+      const updateClause = sql.split("DO UPDATE SET")[1]!;
+      expect(updateClause).not.toContain("color");
+      expect(updateClause).toContain("display_name");
+    });
+  });
+
+  describe("updateCalendarColor", () => {
+    it("updates the calendar's color", async () => {
+      await updateCalendarColor("cal-1", "#e63946");
+
+      expect(mockDb.execute).toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE calendars SET color = $1"),
+        ["#e63946", "cal-1"],
+      );
+    });
   });
 
   describe("getCalendarsForAccount", () => {
@@ -127,6 +158,23 @@ describe("calendars service", () => {
       const result = await getCalendarsForAccount("acc-none");
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe("getAllCalendars", () => {
+    it("returns calendars across every account, with no account filter", async () => {
+      const calendars: DbCalendar[] = [
+        makeCal({ id: "cal-1", account_id: "acc-1" }),
+        makeCal({ id: "cal-2", account_id: "acc-2" }),
+      ];
+      mockDb.select.mockResolvedValueOnce(calendars);
+
+      const result = await getAllCalendars();
+
+      expect(result).toEqual(calendars);
+      const [sql, params] = mockDb.select.mock.calls[0] as [string, unknown[] | undefined];
+      expect(sql).not.toContain("WHERE");
+      expect(params ?? []).toEqual([]);
     });
   });
 

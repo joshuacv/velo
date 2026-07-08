@@ -5,12 +5,13 @@ import { EventCard } from "./EventCard";
 interface MonthViewProps {
   currentDate: Date;
   events: DbCalendarEvent[];
+  calendarColorById?: Record<string, string | null>;
   onEventClick: (event: DbCalendarEvent) => void;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export function MonthView({ currentDate, events, onEventClick }: MonthViewProps) {
+export function MonthView({ currentDate, events, calendarColorById, onEventClick }: MonthViewProps) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const firstDay = new Date(year, month, 1);
@@ -73,6 +74,7 @@ export function MonthView({ currentDate, events, onEventClick }: MonthViewProps)
                   <EventCard
                     key={event.id}
                     event={event}
+                    color={event.calendar_id ? calendarColorById?.[event.calendar_id] : undefined}
                     compact
                     onClick={() => onEventClick(event)}
                   />
