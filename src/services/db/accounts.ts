@@ -34,6 +34,7 @@ export interface DbAccount {
   caldav_home_url: string | null;
   calendar_provider: string | null;
   accept_invalid_certs: number;
+  ics_url: string | null;
 }
 
 async function decryptAccountTokens(account: DbAccount): Promise<DbAccount> {
@@ -317,6 +318,24 @@ export async function updateAccountCalDav(
       fields.calendarProvider,
       accountId,
     ],
+  );
+}
+
+/** Read-only calendar subscribed by ICS/webcal URL — no login, one-way sync. */
+export async function insertIcsAccount(account: {
+  id: string;
+  displayName: string;
+  icsUrl: string;
+}): Promise<void> {
+  const db = await getDb();
+  // `email` is NOT NULL UNIQUE on accounts; synthesize a placeholder since
+  // ICS subscriptions have no associated address. Never shown — the UI
+  // always prefers display_name for this provider.
+  const placeholderEmail = `ics-${account.id}@velo.local`;
+  await db.execute(
+    `INSERT INTO accounts (id, email, display_name, avatar_url, access_token, refresh_token, provider, ics_url)
+     VALUES ($1, $2, $3, NULL, NULL, NULL, 'ics_url', $4)`,
+    [account.id, placeholderEmail, account.displayName, account.icsUrl],
   );
 }
 

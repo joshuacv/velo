@@ -1,6 +1,7 @@
 import type { CalendarProvider } from "./types";
 import { GoogleCalendarProvider } from "./googleCalendarProvider";
 import { CalDAVProvider } from "./caldavProvider";
+import { IcsUrlProvider } from "./icsUrlProvider";
 import { getAccount } from "@/services/db/accounts";
 
 const providerCache = new Map<string, CalendarProvider>();
@@ -21,6 +22,10 @@ export async function getCalendarProvider(accountId: string): Promise<CalendarPr
   // Standalone CalDAV account
   if (account.provider === "caldav") {
     provider = new CalDAVProvider(accountId);
+  }
+  // Read-only ICS/webcal URL subscription
+  else if (account.provider === "ics_url") {
+    provider = new IcsUrlProvider(accountId);
   }
   // IMAP account with CalDAV configured
   else if (account.calendar_provider === "caldav" && account.caldav_url) {
@@ -49,6 +54,7 @@ export async function hasCalendarSupport(accountId: string): Promise<boolean> {
   if (!account) return false;
 
   if (account.provider === "caldav") return true;
+  if (account.provider === "ics_url") return true;
   if (account.provider === "gmail_api") return true;
   if (account.calendar_provider === "caldav" && account.caldav_url) return true;
   return false;

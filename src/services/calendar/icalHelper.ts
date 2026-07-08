@@ -142,6 +142,34 @@ export function parseVEvent(icalData: string, href?: string): CalendarEventData 
   };
 }
 
+/**
+ * Parse a full iCalendar document (VCALENDAR containing one or more VEVENTs)
+ * into individual events — used for read-only ICS/webcal feed subscriptions.
+ * Note: recurring events (RRULE) are not expanded; only their first
+ * occurrence is returned.
+ */
+export function parseICSFeed(icsText: string): CalendarEventData[] {
+  const lines = unfoldLines(icsText);
+  const events: CalendarEventData[] = [];
+  let current: string[] | null = null;
+
+  for (const line of lines) {
+    const upper = line.toUpperCase();
+    if (upper === "BEGIN:VEVENT") {
+      current = [];
+      continue;
+    }
+    if (upper === "END:VEVENT") {
+      if (current) events.push(parseVEvent(current.join("\r\n")));
+      current = null;
+      continue;
+    }
+    if (current) current.push(line);
+  }
+
+  return events;
+}
+
 /** Unfold continuation lines (RFC 5545 §3.1) */
 function unfoldLines(icalData: string): string[] {
   const raw = icalData.replace(/\r\n[ \t]/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");

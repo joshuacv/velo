@@ -1,4 +1,4 @@
-import { generateVEvent, parseVEvent } from "./icalHelper";
+import { generateVEvent, parseVEvent, parseICSFeed } from "./icalHelper";
 import type { CreateEventInput } from "./types";
 
 beforeEach(() => {
@@ -452,6 +452,68 @@ describe("parseVEvent", () => {
     expect(attendees[0].email).toBe("plain@example.com");
     expect(attendees[0].displayName).toBeUndefined();
     expect(attendees[0].responseStatus).toBeUndefined();
+  });
+});
+
+describe("parseICSFeed", () => {
+  it("parses multiple VEVENTs from a single feed", () => {
+    const ical = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      "UID:event-1",
+      "SUMMARY:Morning Standup",
+      "DTSTART:20250620T090000Z",
+      "DTEND:20250620T093000Z",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:event-2",
+      "SUMMARY:Lecture",
+      "DTSTART:20250621T140000Z",
+      "DTEND:20250621T153000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const result = parseICSFeed(ical);
+
+    expect(result).toHaveLength(2);
+    expect(result[0]!.uid).toBe("event-1");
+    expect(result[0]!.summary).toBe("Morning Standup");
+    expect(result[1]!.uid).toBe("event-2");
+    expect(result[1]!.summary).toBe("Lecture");
+  });
+
+  it("returns an empty array for a feed with no events", () => {
+    const ical = ["BEGIN:VCALENDAR", "VERSION:2.0", "END:VCALENDAR"].join("\r\n");
+
+    expect(parseICSFeed(ical)).toEqual([]);
+  });
+
+  it("keeps properties scoped to their own VEVENT block", () => {
+    const ical = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "UID:event-a",
+      "SUMMARY:Event A",
+      "DTSTART:20250620T090000Z",
+      "DTEND:20250620T093000Z",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:event-b",
+      "SUMMARY:Event B",
+      "DTSTART:20250622T090000Z",
+      "DTEND:20250622T093000Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const result = parseICSFeed(ical);
+
+    expect(result[0]!.summary).toBe("Event A");
+    expect(result[0]!.uid).toBe("event-a");
+    expect(result[1]!.summary).toBe("Event B");
+    expect(result[1]!.uid).toBe("event-b");
   });
 });
 

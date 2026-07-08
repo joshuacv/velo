@@ -8,6 +8,7 @@ import {
   updateAccountTokens,
   updateAccountSyncState,
   updateImapAccount,
+  insertIcsAccount,
 } from "./accounts";
 import { createMockGmailAccount, createMockImapAccount } from "@/test/mocks";
 
@@ -332,6 +333,29 @@ describe("accounts", () => {
         null,
         0,
         "acc-imap",
+      ]);
+    });
+  });
+
+  describe("insertIcsAccount", () => {
+    it("inserts a read-only ics_url account with a synthesized placeholder email", async () => {
+      mockExecute.mockResolvedValue(undefined);
+
+      await insertIcsAccount({
+        id: "ics-1",
+        displayName: "University Schedule",
+        icsUrl: "https://example.edu/calendar/feed.ics",
+      });
+
+      expect(mockExecute).toHaveBeenCalledTimes(1);
+      const [sql, params] = mockExecute.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain("INSERT INTO accounts");
+      expect(sql).toContain("'ics_url'");
+      expect(params).toEqual([
+        "ics-1",
+        "ics-ics-1@velo.local",
+        "University Schedule",
+        "https://example.edu/calendar/feed.ics",
       ]);
     });
   });
