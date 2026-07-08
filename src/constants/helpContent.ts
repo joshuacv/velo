@@ -62,6 +62,7 @@ import {
   Paperclip,
   Tags,
   FolderInput,
+  Bot,
 } from "lucide-react";
 
 // ---------- Types ----------
@@ -854,6 +855,20 @@ export const HELP_CATEGORIES: HelpCategory[] = [
           { text: "Answers include references to specific threads you can click to open." },
         ],
       },
+      {
+        id: "phone-assistant",
+        icon: Bot,
+        title: "Phone assistant (Telegram)",
+        summary: "Chat with your inbox and calendar from your phone.",
+        description:
+          "Pair a Telegram bot to chat with Velo from your phone — ask it to summarize mail, draft a reply, check what's on your calendar, or add a new event. It never sends an email or creates an event on its own: every draft comes back with Send/Save/Cancel or Add/Cancel buttons in the chat, and nothing happens until you tap one. It's locked to a single Telegram user ID so no one else can use your bot. Velo needs to be running (it can stay minimized in the tray) for the bot to respond.",
+        tips: [
+          { text: "Set up in Settings > Assistant: paste a bot token from @BotFather, then message the bot once to get your Telegram user ID to allow-list." },
+          { text: "Ask it things like \"what's on my calendar tomorrow?\" or \"reply to Sarah that I'll review by Friday.\"" },
+          { text: "Calendar events and email replies always require a confirmation tap before anything is created or sent." },
+          { text: "A live status line in Settings shows whether the bot is actually running, stopped, or erroring." },
+        ],
+      },
     ],
   },
   {
@@ -1009,18 +1024,47 @@ export const HELP_CATEGORIES: HelpCategory[] = [
       {
         id: "calendar-integration",
         icon: Calendar,
-        title: "Google Calendar integration",
-        summary: "View and manage your calendar alongside email.",
+        title: "Unified calendar view",
+        summary: "See every connected calendar together in one view.",
         description:
-          "Access your Google Calendar directly from the sidebar. Switch between day, week, and month views. See all your events with color-coded calendar support (if you have multiple Google calendars). Create new events directly from the app without switching to a browser. The calendar uses the same Google account as your email and refreshes automatically. Navigate between dates with the toolbar controls.",
+          "The Calendar page shows events from all your connected calendars at once — Google, CalDAV, and read-only URL subscriptions — merged into a single Day, Week, or Month view, not just whichever account is currently active. Toggle the Calendars panel to show or hide individual calendars, grouped by account when you have more than one. New events are created on a calendar you choose from the picker; read-only subscriptions are excluded as create targets.",
         tips: [
           { text: "Open Calendar from the sidebar navigation." },
           { text: "Switch between Day, Week, and Month views from the toolbar." },
           { text: "Click on a time slot to create a new event." },
-          { text: "Supports multiple Google calendars with color coding." },
-          { text: "Calendar uses the same Google OAuth as your email." },
+          { text: "Toggle the Calendars panel to show/hide calendars, grouped by account." },
+          { text: "Any calendar account you add automatically shows up here alongside the others." },
           { text: "Events refresh automatically in the background." },
+          { text: "Click the color swatch next to a calendar in the Calendars panel to recolor it." },
         ],
+      },
+      {
+        id: "caldav-accounts",
+        icon: Server,
+        title: "CalDAV calendar accounts",
+        summary: "Connect iCloud, Fastmail, Nextcloud, or any CalDAV server.",
+        description:
+          "Add a standalone calendar account for any CalDAV-compatible server — iCloud, Fastmail, Nextcloud, and most self-hosted servers all work. This is separate from your email accounts, so you can connect a calendar without also connecting an inbox. Events sync both ways: create, edit, and delete events from Velo just like a native calendar.",
+        tips: [
+          { text: "Settings → Accounts → \"+ Add Account\" → \"CalDAV (Calendar Only).\"" },
+          { text: "Velo auto-detects server settings for common providers from your email address." },
+          { text: "Some providers (like iCloud) require an app-specific password." },
+        ],
+        relatedSettingsTab: "accounts",
+      },
+      {
+        id: "ics-subscription",
+        icon: LinkIcon,
+        title: "Subscribe to a calendar by URL",
+        summary: "Add a read-only .ics/webcal feed — no login required.",
+        description:
+          "Subscribe to any public .ics or webcal feed — a university's class schedule, a shared team calendar, or a service's \"secret address in iCal format\" export. No sign-in is needed; Velo just fetches the feed URL periodically. This calendar is one-way and read-only: events show up alongside your other calendars, but they can't be created, edited, or deleted from Velo, and the Create button is disabled while it's the active calendar.",
+        tips: [
+          { text: "Settings → Accounts → \"+ Add Account\" → \"Subscribe by URL (Read-only).\"" },
+          { text: "Works with webcal:// links too — Velo converts them automatically." },
+          { text: "Good for schedules you don't own but want visible alongside your own calendar." },
+        ],
+        relatedSettingsTab: "accounts",
       },
     ],
   },

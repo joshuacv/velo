@@ -153,7 +153,9 @@ All business logic lives in `src/services/` as plain async functions (except `Gm
 | `imap/` | IMAP sync, folder-to-label mapping, auto-discovery, Tauri command wrappers |
 | `threading/` | JWZ threading algorithm for IMAP message grouping |
 | `ai/` | AI service with 3 providers (selectable models), categorization, Ask Inbox, writing style analysis, auto-drafts, task extraction |
-| `google/` | Google Calendar API |
+| `calendar/` | Multi-provider calendar abstraction (`providerFactory.ts`) — Google Calendar API, CalDAV (two-way), and read-only ICS/webcal URL subscriptions |
+| `google/` | Google Calendar API client (used by the Gmail-account calendar provider) |
+| `assistant/` | Telegram phone assistant — long-polling manager, Claude tool-use agent, and tools for reading mail/calendar and staging replies/events for user confirmation |
 | `composer/` | Draft auto-save (3s debounce) |
 | `search/` | Gmail-style query parser, SQL builder |
 | `filters/` | Auto-apply filter engine (AND logic) |
@@ -190,7 +192,7 @@ Nine Zustand stores manage ephemeral UI state:
 
 ## Database
 
-SQLite via Tauri SQL plugin. 19 migrations, 35 tables total.
+SQLite via Tauri SQL plugin. 24 migrations, 35 tables total.
 
 Key tables: `accounts` (with `provider`, IMAP/SMTP fields), `messages` (with FTS5 index, `auth_results`, IMAP headers, `imap_uid`, `imap_folder`), `threads` (with `is_pinned`, `is_muted`), `thread_labels`, `labels` (with `imap_folder_path`, `imap_special_use`), `contacts`, `attachments` (with `imap_part_id`), `filter_rules`, `scheduled_emails`, `templates`, `signatures`, `image_allowlist`, `settings`, `ai_cache`, `thread_categories`, `calendar_events`, `follow_up_reminders`, `notification_vips`, `unsubscribe_actions`, `bundle_rules`, `bundled_threads`, `send_as_aliases`, `smart_folders`, `link_scan_results`, `phishing_allowlist`, `quick_steps`, `folder_sync_state` (IMAP sync tracking), `pending_operations` (offline action queue), `local_drafts` (offline draft persistence), `writing_style_profiles` (AI writing style per account), `tasks` (full task management with priorities, subtasks, recurrence), `task_tags` (custom task tag colors), `smart_label_rules` (AI-powered auto-labeling rules).
 
