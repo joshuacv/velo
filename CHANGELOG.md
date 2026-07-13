@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.24](https://github.com/joshuacv/velo/compare/velo-v0.4.23...velo-v0.4.24) (2026-07-13)
+
+
+### Bug Fixes
+
+* **calendar:** scope event uniqueness to calendar_id to stop cross-calendar overwrites ([3dd8794](https://github.com/joshuacv/velo/commit/3dd87948b772acde4c58b30cb44e4949d32ab9e4))
+
 ## [0.4.23](https://github.com/joshuacv/velo/compare/velo-v0.4.22...velo-v0.4.23) (2026-07-08)
 
 
