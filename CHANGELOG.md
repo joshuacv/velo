@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.23](https://github.com/joshuacv/velo/compare/velo-v0.4.22...velo-v0.4.23) (2026-07-08)
+
+
+### Bug Fixes
+
+* **ci:** install xdg-utils so the arm64 AppImage bundle succeeds ([21c0b69](https://github.com/joshuacv/velo/commit/21c0b699fc9672ea755a855df9efabe0631a5786))
+
 ## [0.4.22](https://github.com/joshuacv/velo/compare/velo-v0.4.21...velo-v0.4.22) (2026-07-08)
 
 
