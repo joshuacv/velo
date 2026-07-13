@@ -780,6 +780,50 @@ const MIGRATIONS = [
     description: "Read-only ICS URL calendar subscriptions",
     sql: `ALTER TABLE accounts ADD COLUMN ics_url TEXT;`,
   },
+  {
+    version: 25,
+    description: "Scope calendar_events uniqueness to calendar_id, not just account_id",
+    // The old UNIQUE(account_id, google_event_id) constraint let two different
+    // calendars under the same account collide on the same provider event ID
+    // (Google reuses IDs for the same event across a shared/team calendar and
+    // your own) — whichever calendar synced second silently overwrote the
+    // first row's calendar_id, making the event vanish from its real calendar.
+    // SQLite can't alter a table-level UNIQUE constraint in place, so rebuild.
+    sql: `
+      CREATE TABLE calendar_events_new (
+        id TEXT PRIMARY KEY,
+        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        google_event_id TEXT NOT NULL,
+        summary TEXT,
+        description TEXT,
+        location TEXT,
+        start_time INTEGER NOT NULL,
+        end_time INTEGER NOT NULL,
+        is_all_day INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'confirmed',
+        organizer_email TEXT,
+        attendees_json TEXT,
+        html_link TEXT,
+        updated_at INTEGER DEFAULT (unixepoch()),
+        calendar_id TEXT REFERENCES calendars(id) ON DELETE CASCADE,
+        remote_event_id TEXT,
+        etag TEXT,
+        ical_data TEXT,
+        uid TEXT,
+        UNIQUE(account_id, calendar_id, google_event_id)
+      );
+      INSERT INTO calendar_events_new
+        SELECT id, account_id, google_event_id, summary, description, location,
+               start_time, end_time, is_all_day, status, organizer_email,
+               attendees_json, html_link, updated_at, calendar_id,
+               remote_event_id, etag, ical_data, uid
+        FROM calendar_events;
+      DROP TABLE calendar_events;
+      ALTER TABLE calendar_events_new RENAME TO calendar_events;
+      CREATE INDEX idx_cal_events_time ON calendar_events(account_id, start_time, end_time);
+      CREATE INDEX idx_cal_events_calendar ON calendar_events(calendar_id);
+    `,
+  },
 ];
 
 /**

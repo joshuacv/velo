@@ -47,7 +47,7 @@ export async function upsertCalendarEvent(event: {
   await db.execute(
     `INSERT INTO calendar_events (id, account_id, google_event_id, summary, description, location, start_time, end_time, is_all_day, status, organizer_email, attendees_json, html_link, calendar_id, remote_event_id, etag, ical_data, uid)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-     ON CONFLICT(account_id, google_event_id) DO UPDATE SET
+     ON CONFLICT(account_id, calendar_id, google_event_id) DO UPDATE SET
        summary = $4, description = $5, location = $6, start_time = $7, end_time = $8,
        is_all_day = $9, status = $10, organizer_email = $11, attendees_json = $12,
        html_link = $13, calendar_id = $14, remote_event_id = $15, etag = $16,

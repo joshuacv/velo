@@ -78,7 +78,7 @@ describe("calendarEvents service", () => {
       expect(mockDb.execute).toHaveBeenCalledTimes(1);
       const [sql, params] = mockDb.execute.mock.calls[0] as [string, unknown[]];
       expect(sql).toContain("INSERT INTO calendar_events");
-      expect(sql).toContain("ON CONFLICT(account_id, google_event_id) DO UPDATE");
+      expect(sql).toContain("ON CONFLICT(account_id, calendar_id, google_event_id) DO UPDATE");
       // params[0] is the generated UUID id, skip it
       expect(params[1]).toBe("acc-1");
       expect(params[2]).toBe("gev-1");
@@ -143,7 +143,7 @@ describe("calendarEvents service", () => {
       expect(params[17]).toBeNull(); // uid
     });
 
-    it("updates existing event on conflict (same account_id + google_event_id)", async () => {
+    it("updates existing event on conflict (same account_id + calendar_id + google_event_id)", async () => {
       await upsertCalendarEvent({
         accountId: "acc-1",
         googleEventId: "gev-1",
@@ -165,7 +165,7 @@ describe("calendarEvents service", () => {
       });
 
       const [sql, params] = mockDb.execute.mock.calls[0] as [string, unknown[]];
-      expect(sql).toContain("ON CONFLICT(account_id, google_event_id) DO UPDATE SET");
+      expect(sql).toContain("ON CONFLICT(account_id, calendar_id, google_event_id) DO UPDATE SET");
       expect(sql).toContain("calendar_id = $14");
       expect(sql).toContain("remote_event_id = $15");
       expect(sql).toContain("etag = $16");
