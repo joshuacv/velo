@@ -108,6 +108,7 @@ export default function App() {
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
   const [showAskInbox, setShowAskInbox] = useState(false);
@@ -411,6 +412,7 @@ export default function App() {
         }
       } else if (status === "done") {
         setSyncStatus("Sync complete");
+        setLastSyncAt(Date.now());
         setTimeout(() => setSyncStatus(null), 2_000);
         window.dispatchEvent(new Event("velo-sync-done"));
         updateBadgeCount();
@@ -574,7 +576,7 @@ export default function App() {
         </DndProvider>
       </div>
 
-      <StatusBar syncStatus={syncStatus} />
+      <StatusBar syncStatus={syncStatus} lastSyncAt={lastSyncAt} />
 
       {showAddAccount && (
         <AddAccount

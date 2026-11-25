@@ -139,6 +139,8 @@ export function SettingsPage() {
   const [cacheMaxMb, setCacheMaxMb] = useState("500");
   const [cacheSizeMb, setCacheSizeMb] = useState<number | null>(null);
   const [clearingCache, setClearingCache] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupMessage, setBackupMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [reauthStatus, setReauthStatus] = useState<Record<string, "idle" | "authorizing" | "done" | "error">>({});
   const [resyncStatus, setResyncStatus] = useState<Record<string, "idle" | "syncing" | "done" | "error">>({});
   const [expandedImapAccountId, setExpandedImapAccountId] = useState<string | null>(null);
@@ -358,6 +360,77 @@ export function SettingsPage() {
   );
 
   const activeTabDef = tabs.find((t) => t.id === activeTab);
+
+  const handleExportSettings = async () => {
+    setBackupBusy(true);
+    setBackupMessage(null);
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const { writeFile } = await import("@tauri-apps/plugin-fs");
+      const { buildSettingsBackup, serializeBackup } = await import("@/services/settingsTransfer");
+
+      const backup = await buildSettingsBackup();
+      const stamp = new Date().toISOString().slice(0, 10);
+      const filePath = await save({
+        defaultPath: `velo-settings-${stamp}.velobackup`,
+        filters: [{ name: "Velo settings backup", extensions: ["velobackup", "json"] }],
+      });
+      if (!filePath) {
+        setBackupBusy(false);
+        return;
+      }
+      await writeFile(filePath, new TextEncoder().encode(serializeBackup(backup)));
+      setBackupMessage({
+        kind: "success",
+        text: `Exported ${backup.accounts.length} account(s) and ${Object.keys(backup.settings).length} preference(s). No passwords or keys were included.`,
+      });
+    } catch (err) {
+      console.error("Settings export failed:", err);
+      setBackupMessage({ kind: "error", text: `Export failed: ${err instanceof Error ? err.message : String(err)}` });
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleImportSettings = async () => {
+    setBackupBusy(true);
+    setBackupMessage(null);
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const { readFile } = await import("@tauri-apps/plugin-fs");
+      const { parseBackup, applySettingsBackup } = await import("@/services/settingsTransfer");
+
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        filters: [{ name: "Velo settings backup", extensions: ["velobackup", "json"] }],
+      });
+      const filePath = Array.isArray(selected) ? selected[0] : selected;
+      if (!filePath) {
+        setBackupBusy(false);
+        return;
+      }
+      const contents = new TextDecoder().decode(await readFile(filePath));
+      const backup = parseBackup(contents);
+      const summary = await applySettingsBackup(backup);
+
+      const parts = [`Added ${summary.accountsAdded} account(s)`];
+      if (summary.accountsSkipped.length > 0) {
+        parts.push(`skipped ${summary.accountsSkipped.length} already present`);
+      }
+      parts.push(`applied ${summary.settingsApplied} preference(s)`);
+      let text = `${parts.join(", ")}.`;
+      if (summary.accountsNeedingCredentials.length > 0) {
+        text += ` Re-enter the password / re-authenticate for: ${summary.accountsNeedingCredentials.join(", ")}. Restart Velo to load the imported accounts.`;
+      }
+      setBackupMessage({ kind: "success", text });
+    } catch (err) {
+      console.error("Settings import failed:", err);
+      setBackupMessage({ kind: "error", text: `Import failed: ${err instanceof Error ? err.message : String(err)}` });
+    } finally {
+      setBackupBusy(false);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-bg-primary/50">
@@ -613,6 +686,41 @@ export function SettingsPage() {
                         <option value="2000">2 GB</option>
                       </select>
                     </SettingRow>
+                  </Section>
+
+                  <Section title="Backup & Transfer">
+                    <p className="text-xs text-text-tertiary">
+                      Move your account server settings and preferences to another
+                      computer. For your safety the file never contains passwords, OAuth
+                      tokens, or API keys — you re-enter those after importing.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={handleExportSettings}
+                        disabled={backupBusy}
+                        className="bg-bg-tertiary text-text-primary border border-border-primary"
+                      >
+                        {backupBusy ? "Working..." : "Export settings..."}
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={handleImportSettings}
+                        disabled={backupBusy}
+                        className="bg-bg-tertiary text-text-primary border border-border-primary"
+                      >
+                        Import settings...
+                      </Button>
+                    </div>
+                    {backupMessage && (
+                      <p
+                        className={`text-xs mt-1 ${
+                          backupMessage.kind === "error" ? "text-danger" : "text-success"
+                        }`}
+                      >
+                        {backupMessage.text}
+                      </p>
+                    )}
                   </Section>
                 </>
               )}
